@@ -1,0 +1,30 @@
+---
+export const prerender = true;
+---
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Identity Deck</title>
+</head>
+<body style="background:#08080c;color:#f0f0f5;font-family:monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
+  <div style="text-align:center;">
+    <div style="font-size:10px;letter-spacing:4px;text-transform:uppercase;color:#444;margin-bottom:8px;">Identity Deck</div>
+    <h1 style="font-size:36px;font-weight:200;margin:0 0 16px;">Professional Persona Cards</h1>
+    <p style="font-size:12px;color:#555;margin-bottom:24px;">Generate career persona trading cards from any GitHub profile</p>
+    <form action="/" method="get" id="search-form" style="display:inline-block;">
+      <input type="text" name="username" placeholder="Enter GitHub username..."
+        style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#f0f0f5;font-family:monospace;font-size:14px;padding:10px 16px;border-radius:8px;width:280px;outline:none;"
+      />
+    </form>
+  </div>
+  <script>
+    document.getElementById('search-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = e.target.querySelector('input');
+      const username = input?.value.trim();
+      if (username) window.location.href = '/' + encodeURIComponent(username);
+    });
+  </script>
+</body>
+</html>

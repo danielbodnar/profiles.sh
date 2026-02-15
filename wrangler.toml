@@ -1,0 +1,35 @@
+name = "identity-deck"
+compatibility_date = "2025-02-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "placeholder-kv-id"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "identity-deck"
+database_id = "placeholder-d1-id"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "identity-deck-assets"
+
+[[queues.producers]]
+binding = "PROFILE_QUEUE"
+queue = "profile-computation"
+
+[[queues.consumers]]
+queue = "profile-computation"
+max_batch_size = 5
+max_batch_timeout = 30
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
