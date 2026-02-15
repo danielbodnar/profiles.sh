@@ -89,7 +89,7 @@ export async function fetchRepos(
     const data: GitHubRepo[] = await res.json();
     if (data.length === 0) break;
 
-    repos.push(...data);
+    repos.push(...data.filter(r => !r.fork));
     if (data.length < PER_PAGE) break;
     page++;
   }
@@ -113,6 +113,7 @@ export async function fetchAllStars(
 ): Promise<GitHubRepo[]> {
   const stars: GitHubRepo[] = [];
   let page = 1;
+  let fetchedPages = 0;
 
   while (page <= MAX_STAR_PAGES) {
     const cacheKey = `github:stars:${username}:${page}`;
@@ -135,6 +136,7 @@ export async function fetchAllStars(
       await putCached(env.KV, cacheKey, data);
     }
 
+    fetchedPages++;
     stars.push(...data);
     if (data.length < PER_PAGE) break;
     page++;
@@ -142,7 +144,7 @@ export async function fetchAllStars(
 
   // Store pagination metadata
   const meta: StarsMeta = {
-    totalPages: page - 1,
+    totalPages: fetchedPages,
     fetchedAt: new Date().toISOString(),
     complete: page <= MAX_STAR_PAGES,
   };

@@ -10,9 +10,8 @@
  * Uses design tokens from src/styles/tokens.ts for persona colors.
  */
 
-import { PERSONA_COLORS, RADAR_LABELS } from "../../styles/tokens";
+import { PERSONA_COLORS } from "../../styles/tokens";
 import type { ProfileRow } from "../db/types";
-import type { PersonaRow, RadarAxisRow } from "../db/types";
 
 /** Persona data needed for the OG template (subset of PersonaRow). */
 export interface OGPersona {

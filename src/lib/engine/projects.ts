@@ -91,7 +91,7 @@ export function generateProjectCards(ownedRepos: RepoData[]): ProjectCard[] {
         .split("-")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ");
-      if (!tech.includes(display) && !tech.includes(repo.language || "")) {
+      if (!tech.includes(display) && display.toLowerCase() !== (repo.language || "").toLowerCase()) {
         tech.push(display);
       }
       if (tech.length >= 8) break;

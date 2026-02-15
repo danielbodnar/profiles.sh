@@ -31,9 +31,9 @@ try {
 function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accent: string }[] {
   if (!profile?.personas) return [];
   return profile.personas.map((p: any) => ({
-    id: p.id,
-    shortTitle: (p.shortTitle || p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
-    accent: p.accent || PERSONA_COLORS[p.id]?.accent || "#888",
+    id: p.persona_id,
+    shortTitle: (p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
+    accent: p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888",
   }));
 }
 ---
@@ -97,20 +97,20 @@ function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accen
   {profileData && profileData.personas && (
     <div class="embed-grid">
       {profileData.personas.map((p: any) => {
-        const accent = p.accent || PERSONA_COLORS[p.id]?.accent || "#888";
+        const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
         const stats = (p.stats || []).map((s: any) =>
           Array.isArray(s) ? { label: s[0], value: s[1] } : s
         );
         return (
           <PersonaCard
-            id={p.id}
+            id={p.persona_id}
             title={p.title}
-            shortTitle={(p.shortTitle || p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
+            shortTitle={(p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
             tagline={p.tagline}
             accent={accent}
             icon={p.icon}
-            experience={p.experience}
-            yearsActive={p.yearsActive}
+            experience={p.experience_label}
+            yearsActive={p.years_active}
             stats={stats}
             stack={p.stack || []}
             details={p.details || []}
@@ -123,19 +123,19 @@ function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accen
 
   {/* Persona Modals */}
   {profileData && profileData.personas && profileData.personas.map((p: any) => {
-    const accent = p.accent || PERSONA_COLORS[p.id]?.accent || "#888";
+    const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
     const stats = (p.stats || []).map((s: any) =>
       Array.isArray(s) ? { label: s[0], value: s[1] } : s
     );
     return (
       <PersonaModal
-        id={p.id}
+        id={p.persona_id}
         title={p.title}
         tagline={p.tagline}
         accent={accent}
         icon={p.icon}
-        experience={p.experience}
-        yearsActive={p.yearsActive}
+        experience={p.experience_label}
+        yearsActive={p.years_active}
         stats={stats}
         stack={p.stack || []}
         details={p.details || []}

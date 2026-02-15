@@ -21,9 +21,9 @@ try {
 
   if (resp.ok) {
     const data = await resp.json();
-    profileName = data.name || username;
+    profileName = data.profile?.display_name || username;
     if (data.personas) {
-      persona = data.personas.find((p: any) => p.id === id);
+      persona = data.personas.find((p: any) => p.persona_id === id);
     }
     if (!persona) {
       errorMessage = `Persona "${id}" not found for ${username}.`;
@@ -37,7 +37,7 @@ try {
   errorMessage = "Failed to connect to the API.";
 }
 
-const accent = persona?.accent || PERSONA_COLORS[id]?.accent || "#888";
+const accent = persona?.accent_color || PERSONA_COLORS[id]?.accent || "#888";
 const pageTitle = persona
   ? `${persona.title} — ${profileName} — Identity Deck`
   : `${id} — Identity Deck`;
@@ -67,14 +67,14 @@ const pageDesc = persona
 
       <div class="card-center">
         <PersonaCard
-          id={persona.id}
+          id={persona.persona_id}
           title={persona.title}
-          shortTitle={(persona.shortTitle || persona.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
+          shortTitle={(persona.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
           tagline={persona.tagline}
           accent={accent}
           icon={persona.icon}
-          experience={persona.experience}
-          yearsActive={persona.yearsActive}
+          experience={persona.experience_label}
+          yearsActive={persona.years_active}
           stats={(persona.stats || []).map((s: any) =>
             Array.isArray(s) ? { label: s[0], value: s[1] } : s
           )}
@@ -86,13 +86,13 @@ const pageDesc = persona
 
       {/* Modal (open by default on single card page) */}
       <PersonaModal
-        id={persona.id}
+        id={persona.persona_id}
         title={persona.title}
         tagline={persona.tagline}
         accent={accent}
         icon={persona.icon}
-        experience={persona.experience}
-        yearsActive={persona.yearsActive}
+        experience={persona.experience_label}
+        yearsActive={persona.years_active}
         stats={(persona.stats || []).map((s: any) =>
           Array.isArray(s) ? { label: s[0], value: s[1] } : s
         )}

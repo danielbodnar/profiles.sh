@@ -71,6 +71,7 @@ export function computeDomainScores(
     const lang = (repo.language || "").toLowerCase();
     const topics = (repo.topics || []).map((t) => t.toLowerCase());
     const desc = (repo.description || "").toLowerCase();
+    const name = (repo.full_name || "").toLowerCase();
 
     for (const [domain, signals] of Object.entries(DOMAIN_SIGNALS)) {
       let repoScore = 0;
@@ -88,6 +89,12 @@ export function computeDomainScores(
         desc.includes(kw),
       ).length;
       repoScore += descMatches * 1.5;
+
+      // Repo name match: +1 per keyword
+      const nameMatches = signals.descriptionKeywords.filter((kw) =>
+        name.includes(kw),
+      ).length;
+      repoScore += nameMatches * 1;
 
       scores[domain] += repoScore * 3; // 3x multiplier for owned repos
     }

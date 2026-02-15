@@ -9,7 +9,7 @@ import PersonaModal from "../../components/PersonaModal.astro";
 import ProjectCard from "../../components/ProjectCard.astro";
 import ProjectModal from "../../components/ProjectModal.astro";
 import LoadingState from "../../components/LoadingState.astro";
-import { PERSONA_COLORS, RADAR_LABELS } from "../../styles/tokens";
+import { PERSONA_COLORS } from "../../styles/tokens";
 
 const { username } = Astro.params;
 
@@ -41,23 +41,12 @@ try {
 
 // Helper: build radar axes from profile data
 function buildRadarAxes(profile: any) {
-  if (!profile?.personas) return [];
-  const axes: { label: string; value: number; color: string }[] = [];
-  for (const [key, config] of Object.entries(RADAR_LABELS)) {
-    const persona = profile.personas.find((p: any) => p.id === key);
-    if (persona && persona.stats) {
-      const avgStat = Math.round(
-        persona.stats.reduce((sum: number, s: any) => sum + (s.value || s[1] || 0), 0) /
-          persona.stats.length
-      );
-      axes.push({
-        label: config.label,
-        value: avgStat,
-        color: config.color,
-      });
-    }
-  }
-  return axes;
+  if (!profile?.radar) return [];
+  return profile.radar.map((r: any) => ({
+    label: r.label,
+    value: r.value,
+    color: r.color,
+  }));
 }
 
 // Helper: build subtitle from persona titles
@@ -66,7 +55,7 @@ function buildSubtitle(profile: any): string {
   return profile.personas
     .slice(0, 4)
     .map((p: any) => {
-      let t = p.shortTitle || p.title || "";
+      let t = p.title || "";
       return t.replace(/^(Principal|Staff|Crazy)\s+/, "");
     })
     .join(" \u00B7 ");
@@ -75,11 +64,10 @@ function buildSubtitle(profile: any): string {
 // Helper: build meta string
 function buildMeta(profile: any): string {
   const parts: string[] = [];
-  if (profile?.email) parts.push(profile.email);
-  if (profile?.location) parts.push(profile.location);
-  if (profile?.login) parts.push(`github.com/${profile.login}`);
-  if (profile?.repoCount) parts.push(`${profile.repoCount} repos`);
-  if (profile?.starCount) parts.push(`${profile.starCount}+ stars`);
+  if (profile?.profile?.email) parts.push(profile.profile.email);
+  if (profile?.profile?.location) parts.push(profile.profile.location);
+  if (profile?.profile?.username) parts.push(`github.com/${profile.profile.username}`);
+  if (profile?.profile?.public_repos) parts.push(`${profile.profile.public_repos} repos`);
   return parts.join(" \u00B7 ");
 }
 
@@ -87,9 +75,9 @@ function buildMeta(profile: any): string {
 function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accent: string }[] {
   if (!profile?.personas) return [];
   return profile.personas.map((p: any) => ({
-    id: p.id,
-    shortTitle: (p.shortTitle || p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
-    accent: p.accent || PERSONA_COLORS[p.id]?.accent || "#888",
+    id: p.persona_id,
+    shortTitle: (p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
+    accent: p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888",
   }));
 }
 
@@ -98,11 +86,11 @@ const subtitle = profileData ? buildSubtitle(profileData) : "";
 const meta = profileData ? buildMeta(profileData) : "";
 const personaRefs = profileData ? buildPersonaRefs(profileData) : [];
 
-const pageTitle = profileData?.name
-  ? `${profileData.name} — Identity Deck`
+const pageTitle = profileData?.profile?.display_name
+  ? `${profileData.profile.display_name} — Identity Deck`
   : `${username} — Identity Deck`;
-const pageDesc = profileData?.name
-  ? `Professional persona cards for ${profileData.name}`
+const pageDesc = profileData?.profile?.display_name
+  ? `Professional persona cards for ${profileData.profile.display_name}`
   : `Identity Deck for ${username}`;
 ---
 <Base title={pageTitle} description={pageDesc}>
@@ -125,10 +113,10 @@ const pageDesc = profileData?.name
     <main class="profile-page">
       {/* Profile Header */}
       <ProfileHeader
-        name={profileData.name || username}
+        name={profileData.profile?.display_name || username}
         subtitle={subtitle}
         meta={meta}
-        avatarUrl={profileData.avatarUrl}
+        avatarUrl={profileData.profile?.avatar_url}
       />
 
       {/* Radar Chart */}
@@ -137,10 +125,10 @@ const pageDesc = profileData?.name
       )}
 
       {/* Star Interests */}
-      {profileData.starInterests && profileData.starInterests.length > 0 && (
+      {profileData.interests && profileData.interests.length > 0 && (
         <section class="interests-section">
           <div class="interests-grid">
-            {profileData.starInterests.map((si: any) => (
+            {profileData.interests.map((si: any) => (
               <StarInterestTile
                 label={si.label}
                 count={si.count}
@@ -155,9 +143,9 @@ const pageDesc = profileData?.name
       {profileData.personas && profileData.personas.length > 0 && (
         <ColorLegend
           personas={profileData.personas.map((p: any) => ({
-            id: p.id,
-            title: (p.shortTitle || p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
-            accent: p.accent || PERSONA_COLORS[p.id]?.accent || "#888",
+            id: p.persona_id,
+            title: (p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
+            accent: p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888",
           }))}
         />
       )}
@@ -167,20 +155,20 @@ const pageDesc = profileData?.name
         <section class="personas-section">
           <div class="persona-grid">
             {profileData.personas.map((p: any) => {
-              const accent = p.accent || PERSONA_COLORS[p.id]?.accent || "#888";
+              const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
               const stats = (p.stats || []).map((s: any) =>
                 Array.isArray(s) ? { label: s[0], value: s[1] } : s
               );
               return (
                 <PersonaCard
-                  id={p.id}
+                  id={p.persona_id}
                   title={p.title}
-                  shortTitle={(p.shortTitle || p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
+                  shortTitle={(p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
                   tagline={p.tagline}
                   accent={accent}
                   icon={p.icon}
-                  experience={p.experience}
-                  yearsActive={p.yearsActive}
+                  experience={p.experience_label}
+                  yearsActive={p.years_active}
                   stats={stats}
                   stack={p.stack || []}
                   details={p.details || []}
@@ -204,10 +192,10 @@ const pageDesc = profileData?.name
             {profileData.projects.map((proj: any) => (
               <ProjectCard
                 name={proj.name}
-                description={proj.description || proj.desc}
+                description={proj.description}
                 url={proj.url}
                 tech={proj.tech || []}
-                personaMap={proj.personaMap || proj.pids || []}
+                personaMap={proj.persona_map || []}
                 personas={personaRefs}
               />
             ))}
@@ -217,19 +205,19 @@ const pageDesc = profileData?.name
 
       {/* Persona Modals (hidden by default) */}
       {profileData.personas && profileData.personas.map((p: any) => {
-        const accent = p.accent || PERSONA_COLORS[p.id]?.accent || "#888";
+        const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
         const stats = (p.stats || []).map((s: any) =>
           Array.isArray(s) ? { label: s[0], value: s[1] } : s
         );
         return (
           <PersonaModal
-            id={p.id}
+            id={p.persona_id}
             title={p.title}
             tagline={p.tagline}
             accent={accent}
             icon={p.icon}
-            experience={p.experience}
-            yearsActive={p.yearsActive}
+            experience={p.experience_label}
+            yearsActive={p.years_active}
             stats={stats}
             stack={p.stack || []}
             details={p.details || []}
@@ -243,10 +231,10 @@ const pageDesc = profileData?.name
       {profileData.projects && profileData.projects.map((proj: any) => (
         <ProjectModal
           name={proj.name}
-          description={proj.description || proj.desc}
+          description={proj.description}
           url={proj.url}
           tech={proj.tech || []}
-          personaMap={proj.personaMap || proj.pids || []}
+          personaMap={proj.persona_map || []}
           personas={personaRefs}
         />
       ))}

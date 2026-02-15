@@ -75,27 +75,31 @@ export const GET: APIRoute = async ({ params, locals }) => {
     // the contract the API layer expects from the OG module).
     const { generateOGImage } = await import('../../lib/og/generator');
 
-    const profileData = {
-      username,
-      display_name: profile.display_name as string | null,
-      avatar_url: profile.avatar_url as string | null,
-      bio: profile.bio as string | null,
-      personas: personas.map((p) => ({
-        title: p.title as string,
-        tagline: p.tagline as string | null,
-        accent_color: p.accent_color as string | null,
-        icon: p.icon as string | null,
-      })),
-    };
+    const result = await generateOGImage(profile as any, personas as any[], { R2: env.R2 });
 
-    const pngBuffer: ArrayBuffer = await generateOGImage(profileData);
+    // generateOGImage returns Uint8Array (PNG) or string (SVG fallback)
+    if (typeof result === 'string') {
+      // SVG fallback — store and return as SVG
+      await env.R2.put(r2Key.replace('.png', '.svg'), result, {
+        httpMetadata: { contentType: 'image/svg+xml' },
+      });
 
-    // ---- Store in R2 for future requests ----
-    await env.R2.put(r2Key, pngBuffer, {
+      return new Response(result, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/svg+xml',
+          'Cache-Control': 'public, max-age=3600',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // PNG result — store in R2 for future requests
+    await env.R2.put(r2Key, result, {
       httpMetadata: { contentType: 'image/png' },
     });
 
-    return new Response(pngBuffer, {
+    return new Response(result, {
       status: 200,
       headers: {
         'Content-Type': 'image/png',

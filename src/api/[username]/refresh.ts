@@ -70,7 +70,6 @@ export const POST: APIRoute = async ({ params, locals }) => {
     await env.PROFILE_QUEUE.send({
       username,
       requestedAt: Date.now(),
-      force: true,
     });
 
     return jsonResponse(
