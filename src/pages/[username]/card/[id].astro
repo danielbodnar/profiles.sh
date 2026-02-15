@@ -1,0 +1,269 @@
+---
+import Base from "../../../layouts/Base.astro";
+import PersonaCard from "../../../components/PersonaCard.astro";
+import PersonaModal from "../../../components/PersonaModal.astro";
+import { PERSONA_COLORS } from "../../../styles/tokens";
+
+const { username, id } = Astro.params;
+
+if (!username || !id) {
+  return Astro.redirect("/");
+}
+
+// Access D1 directly (Workers can't self-fetch)
+let persona: any = null;
+let profileName = username;
+let errorMessage = "";
+
+try {
+  const env = Astro.locals.runtime.env as Env;
+  const lowerUsername = username.toLowerCase();
+
+  const profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
+    .bind(lowerUsername).first();
+
+  if (!profile) {
+    errorMessage = `User "${username}" not found.`;
+  } else {
+    profileName = (profile.display_name as string) || username;
+    const { results: personas } = await env.DB.prepare(
+      'SELECT * FROM personas WHERE username = ? ORDER BY sort_order ASC'
+    ).bind(lowerUsername).all();
+
+    const parsed = personas.map((p: any) => ({
+      ...p,
+      stats: typeof p.stats === 'string' ? JSON.parse(p.stats) : p.stats,
+      stack: typeof p.stack === 'string' ? JSON.parse(p.stack) : p.stack,
+      details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
+      employers: typeof p.employers === 'string' ? JSON.parse(p.employers) : p.employers,
+      links: typeof p.links === 'string' ? JSON.parse(p.links) : p.links,
+    }));
+
+    persona = parsed.find((p: any) => p.persona_id === id);
+    if (!persona) {
+      errorMessage = `Persona "${id}" not found for ${username}.`;
+    }
+  }
+} catch (e) {
+  errorMessage = "Failed to load profile data.";
+}
+
+const accent = persona?.accent_color || PERSONA_COLORS[id]?.accent || "#888";
+const pageTitle = persona
+  ? `${persona.title} — ${profileName} — Identity Deck`
+  : `${id} — Identity Deck`;
+const pageDesc = persona
+  ? `${persona.tagline} — ${profileName}'s Identity Deck`
+  : `Identity Deck persona card`;
+---
+<Base title={pageTitle} description={pageDesc}>
+  {errorMessage && (
+    <main class="error-page">
+      <div class="error-content">
+        <div class="label">Identity Deck</div>
+        <p class="error-msg">{errorMessage}</p>
+        <a href={`/${username}`} class="back-link">&larr; view full profile</a>
+      </div>
+    </main>
+  )}
+
+  {persona && (
+    <main class="card-page">
+      <div class="card-page-header">
+        <div class="label">Identity Deck</div>
+        <p class="card-page-sub">
+          <a href={`/${username}`}>{profileName}</a> &middot; Persona Card
+        </p>
+      </div>
+
+      <div class="card-center">
+        <PersonaCard
+          id={persona.persona_id}
+          title={persona.title}
+          shortTitle={(persona.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
+          tagline={persona.tagline}
+          accent={accent}
+          icon={persona.icon}
+          experience={persona.experience_label}
+          yearsActive={persona.years_active}
+          stats={(persona.stats || []).map((s: any) =>
+            Array.isArray(s) ? { label: s[0], value: s[1] } : s
+          )}
+          stack={persona.stack || []}
+          details={persona.details || []}
+          employers={persona.employers || []}
+        />
+      </div>
+
+      {/* Modal (open by default on single card page) */}
+      <PersonaModal
+        id={persona.persona_id}
+        title={persona.title}
+        tagline={persona.tagline}
+        accent={accent}
+        icon={persona.icon}
+        experience={persona.experience_label}
+        yearsActive={persona.years_active}
+        stats={(persona.stats || []).map((s: any) =>
+          Array.isArray(s) ? { label: s[0], value: s[1] } : s
+        )}
+        stack={persona.stack || []}
+        details={persona.details || []}
+        employers={persona.employers || []}
+        links={persona.links || []}
+      />
+
+      <div class="card-page-footer">
+        <a href={`/${username}`}>&larr; view full profile</a>
+      </div>
+    </main>
+  )}
+</Base>
+
+<script>
+  // On single card pages, auto-open the modal
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.querySelector('.modal-overlay');
+    if (overlay) {
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+  });
+
+  // Modal open: click on persona card "open details" button
+  document.querySelectorAll('[data-persona-open]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = (btn as HTMLElement).dataset.personaOpen;
+      const modal = document.getElementById(`persona-modal-${id}`);
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+    });
+  });
+
+  // Modal close
+  document.querySelectorAll('[data-modal-close]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const overlay = (btn as HTMLElement).closest('.modal-overlay');
+      if (overlay) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    });
+  });
+
+  // Close on backdrop click
+  document.querySelectorAll('.modal-overlay').forEach((overlay) => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    });
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.active').forEach((overlay) => {
+        overlay.classList.remove('active');
+      });
+      document.body.style.overflow = '';
+    }
+  });
+</script>
+
+<style>
+  .error-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .error-content {
+    text-align: center;
+  }
+
+  .label {
+    font-size: 10px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #444;
+    margin-bottom: 16px;
+  }
+
+  .error-msg {
+    font-size: 12px;
+    color: #888;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    margin: 0 0 24px;
+  }
+
+  .back-link {
+    font-size: 10px;
+    color: #666;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .back-link:hover {
+    color: #aaa;
+  }
+
+  .card-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  .card-page-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .card-page-sub {
+    font-size: 12px;
+    color: #555;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    margin: 8px 0 0;
+  }
+
+  .card-page-sub a {
+    color: #888;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .card-page-sub a:hover {
+    color: #ccc;
+  }
+
+  .card-center {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .card-page-footer {
+    margin-top: 24px;
+  }
+
+  .card-page-footer a {
+    font-size: 10px;
+    color: #666;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .card-page-footer a:hover {
+    color: #aaa;
+  }
+</style>

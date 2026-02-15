@@ -1,0 +1,190 @@
+---
+import { PERSONA_COLORS } from "../styles/tokens";
+
+interface PersonaRef {
+  id: string;
+  shortTitle: string;
+  accent: string;
+}
+
+interface Props {
+  name: string;
+  description: string;
+  url?: string;
+  tech: string[];
+  personaMap: string[];
+  personas: PersonaRef[];
+}
+
+const { name, description, url, tech, personaMap, personas } = Astro.props;
+
+// Build stripe gradient from persona colors
+const stripeColors = personaMap
+  .map((pid) => {
+    const p = PERSONA_COLORS[pid];
+    return p ? p.accent : "#888";
+  })
+  .filter(Boolean);
+
+const stripeH = 100 / stripeColors.length;
+const stripeGrad = stripeColors
+  .map((c, i) => `${c} ${i * stripeH}%, ${c} ${(i + 1) * stripeH}%`)
+  .join(", ");
+
+// Resolve persona short names
+const personaLegend = personaMap
+  .map((pid) => {
+    const found = personas.find((p) => p.id === pid);
+    return found ? { id: pid, title: found.shortTitle, accent: found.accent } : null;
+  })
+  .filter(Boolean) as { id: string; title: string; accent: string }[];
+---
+<div class="project-card" data-project-id={name}>
+  <div class="card-body">
+    <div class="stripe" style={`background: linear-gradient(180deg, ${stripeGrad});`}></div>
+    <div class="card-content">
+      <h3 class="proj-name">{name}</h3>
+      <p class="proj-desc">{description}</p>
+      <div class="proj-tech">
+        {tech.map((t) => (
+          <span class="tech-badge">{t}</span>
+        ))}
+      </div>
+      <div class="proj-legend">
+        {personaLegend.map((pl) => (
+          <div class="legend-item">
+            <div class="legend-dot" style={`background:${pl.accent};`}></div>
+            <span>{pl.title}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+  <button
+    class="proj-button"
+    style={
+      stripeColors.length > 1
+        ? `background: linear-gradient(90deg, ${stripeColors.join(", ")});`
+        : `background: ${stripeColors[0] || "#888"};`
+    }
+    data-project-open={name}
+  >
+    &#8599; open details &#8601;
+  </button>
+</div>
+
+<style>
+  .project-card {
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0d0d14 0%, #14141e 100%);
+    border-radius: 14px 14px 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    transition: border-color 0.2s;
+  }
+
+  .project-card:hover .card-body {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .stripe {
+    width: 6px;
+    flex-shrink: 0;
+  }
+
+  .card-content {
+    flex: 1;
+    padding: 16px 18px;
+  }
+
+  .proj-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    margin-bottom: 3px;
+  }
+
+  .proj-desc {
+    margin: 0 0 10px;
+    font-size: 10px;
+    color: #888;
+    line-height: 1.4;
+  }
+
+  .proj-tech {
+    margin-bottom: 10px;
+    line-height: 1.7;
+  }
+
+  .tech-badge {
+    display: inline-block;
+    font-size: 8px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 3px;
+    margin-bottom: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #aaa;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .proj-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .legend-item span {
+    font-size: 7px;
+    color: #666;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+
+  .proj-button {
+    width: 100%;
+    padding: 5px 0;
+    border-radius: 0 0 14px 14px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    font-weight: 700;
+    color: #0a0a0f;
+    letter-spacing: 1px;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+    transition: filter 0.15s;
+    filter: brightness(0.85);
+  }
+
+  .proj-button:hover {
+    filter: brightness(1.15);
+  }
+</style>

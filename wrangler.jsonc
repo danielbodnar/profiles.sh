@@ -1,0 +1,67 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "identity-deck",
+  "account_id": "5dae265f74e6077ad674a3d855bf9853",
+  "main": "dist/_worker.js/index.js",
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  "compatibility_date": "2026-01-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+
+  // KV — GitHub API response cache (24h TTL) + Astro sessions
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "0260553cee2741e697e4010590100f3a"
+    },
+    {
+      "binding": "SESSION",
+      "id": "63b5528b83e246d291717f266476289f"
+    }
+  ],
+
+  // D1 — Persistent storage for profiles, personas, projects
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "identity-deck",
+      "database_id": "4a47b301-5aa0-4a04-a1a2-b7f36ef78cae",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // R2 — Store generated OG images
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "identity-deck-assets"
+    }
+  ],
+
+  // Queues — Background processing for large profiles
+  // NOTE: Consumer config is omitted until Astro adapter supports queue handler exports.
+  // The queue consumer logic is in src/lib/queue-consumer.ts and can be wired
+  // via a separate worker or when Astro adds queue handler support.
+  "queues": {
+    "producers": [
+      {
+        "binding": "PROFILE_QUEUE",
+        "queue": "profile-computation"
+      }
+    ]
+  }
+}

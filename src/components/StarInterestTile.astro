@@ -1,0 +1,52 @@
+---
+interface Props {
+  label: string;
+  count: string;
+  examples: string;
+}
+
+const { label, count, examples } = Astro.props;
+---
+<div class="tile">
+  <div class="tile-header">
+    <span class="tile-label">{label}</span>
+    <span class="tile-count">{count}</span>
+  </div>
+  <div class="tile-examples">{examples}</div>
+</div>
+
+<style>
+  .tile {
+    width: 230px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .tile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+
+  .tile-label {
+    font-size: 10px;
+    color: #ccc;
+    font-weight: 600;
+  }
+
+  .tile-count {
+    font-size: 8px;
+    color: #555;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+
+  .tile-examples {
+    font-size: 8px;
+    color: #666;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    line-height: 1.4;
+  }
+</style>

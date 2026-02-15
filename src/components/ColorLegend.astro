@@ -1,0 +1,51 @@
+---
+interface PersonaLegendItem {
+  id: string;
+  title: string;
+  accent: string;
+}
+
+interface Props {
+  personas: PersonaLegendItem[];
+}
+
+const { personas } = Astro.props;
+---
+<div class="legend">
+  {personas.map((p) => (
+    <div class="legend-item">
+      <div class="legend-swatch" style={`background:${p.accent}`}></div>
+      <span class="legend-label">{p.title}</span>
+    </div>
+  ))}
+</div>
+
+<style>
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px 12px;
+    max-width: 800px;
+    margin: 0 auto 32px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .legend-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .legend-label {
+    font-size: 8px;
+    color: #666;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+</style>

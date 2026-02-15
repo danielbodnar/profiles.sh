@@ -1,0 +1,170 @@
+---
+interface Props {
+  username: string;
+}
+
+const { username } = Astro.props;
+---
+<div class="loading-container">
+  <div class="loading-content">
+    <div class="label">Identity Deck</div>
+    <div class="spinner">
+      <div class="spinner-ring"></div>
+    </div>
+    <p class="computing-text">Computing profile for <strong>{username}</strong>...</p>
+    <p class="computing-sub">Analyzing repos, stars, and contributions</p>
+
+    {/* Skeleton cards */}
+    <div class="skeleton-grid">
+      {Array.from({ length: 5 }).map(() => (
+        <div class="skeleton-card">
+          <div class="skeleton-bar-top"></div>
+          <div class="skeleton-body">
+            <div class="skeleton-circle"></div>
+            <div class="skeleton-line w60"></div>
+            <div class="skeleton-line w80"></div>
+            <div class="skeleton-line w40"></div>
+            <div class="skeleton-line w70"></div>
+          </div>
+          <div class="skeleton-bar-bottom"></div>
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ username }}>
+  // Poll every 3 seconds until profile is ready
+  let pollInterval = setInterval(async () => {
+    try {
+      const resp = await fetch(`/api/${encodeURIComponent(username)}`);
+      if (resp.ok && resp.status === 200) {
+        clearInterval(pollInterval);
+        window.location.reload();
+      }
+    } catch (e) {
+      // Ignore fetch errors, keep polling
+    }
+  }, 3000);
+</script>
+
+<style>
+  .loading-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .loading-content {
+    text-align: center;
+    max-width: 700px;
+  }
+
+  .label {
+    font-size: 10px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #444;
+    margin-bottom: 32px;
+  }
+
+  .spinner {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .spinner-ring {
+    width: 40px;
+    height: 40px;
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    border-top: 2px solid rgba(100, 200, 255, 0.6);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .computing-text {
+    font-size: 14px;
+    color: #888;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    margin: 0 0 4px;
+  }
+
+  .computing-text strong {
+    color: #ccc;
+    font-weight: 600;
+  }
+
+  .computing-sub {
+    font-size: 10px;
+    color: #555;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    margin: 0 0 32px;
+  }
+
+  .skeleton-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .skeleton-card {
+    width: 152px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0c0c14 0%, #111119 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .skeleton-bar-top {
+    height: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .skeleton-body {
+    padding: 10px 9px;
+  }
+
+  .skeleton-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.04);
+    margin-bottom: 8px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .skeleton-line {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    margin-bottom: 6px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .w60 { width: 60%; }
+  .w80 { width: 80%; }
+  .w40 { width: 40%; }
+  .w70 { width: 70%; }
+
+  .skeleton-bar-bottom {
+    height: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+</style>

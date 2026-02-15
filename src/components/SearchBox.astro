@@ -1,0 +1,78 @@
+---
+interface Props {
+  autofocus?: boolean;
+}
+
+const { autofocus = false } = Astro.props;
+---
+<form id="search-form" class="search-box">
+  <input
+    type="text"
+    name="username"
+    placeholder="Enter GitHub username..."
+    autocomplete="off"
+    autocapitalize="none"
+    spellcheck="false"
+    autofocus={autofocus}
+  />
+  <button type="submit" aria-label="Search">
+    <span class="arrow">&rarr;</span>
+  </button>
+</form>
+
+<script>
+  document.getElementById('search-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = (e.target as HTMLFormElement).querySelector('input');
+    const username = input?.value.trim();
+    if (username) window.location.href = '/' + encodeURIComponent(username);
+  });
+</script>
+
+<style>
+  .search-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .search-box:focus-within {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .search-box input {
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    color: #f0f0f5;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    font-size: 14px;
+    padding: 10px 16px;
+    width: 280px;
+    outline: none;
+  }
+
+  .search-box input::placeholder {
+    color: #555;
+  }
+
+  .search-box button {
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    color: #666;
+    font-size: 16px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    font-family: inherit;
+  }
+
+  .search-box button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f0f0f5;
+  }
+</style>

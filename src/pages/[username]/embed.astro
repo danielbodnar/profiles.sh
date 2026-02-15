@@ -1,0 +1,211 @@
+---
+import PersonaCard from "../../components/PersonaCard.astro";
+import PersonaModal from "../../components/PersonaModal.astro";
+import { PERSONA_COLORS } from "../../styles/tokens";
+
+const { username } = Astro.params;
+
+if (!username) {
+  return new Response("Missing username", { status: 400 });
+}
+
+let profileData: any = null;
+let errorMessage = "";
+
+try {
+  const env = Astro.locals.runtime.env as Env;
+  const lowerUsername = username.toLowerCase();
+
+  const profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
+    .bind(lowerUsername).first();
+
+  if (!profile) {
+    errorMessage = "Profile not found.";
+  } else {
+    const [personasResult] = await Promise.all([
+      env.DB.prepare('SELECT * FROM personas WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+    ]);
+
+    const personas = personasResult.results.map((p: any) => ({
+      ...p,
+      stats: typeof p.stats === 'string' ? JSON.parse(p.stats) : p.stats,
+      stack: typeof p.stack === 'string' ? JSON.parse(p.stack) : p.stack,
+      details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
+      employers: typeof p.employers === 'string' ? JSON.parse(p.employers) : p.employers,
+      links: typeof p.links === 'string' ? JSON.parse(p.links) : p.links,
+    }));
+
+    profileData = { personas };
+  }
+} catch (e) {
+  errorMessage = "Failed to load profile.";
+}
+
+// Build persona refs
+function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accent: string }[] {
+  if (!profile?.personas) return [];
+  return profile.personas.map((p: any) => ({
+    id: p.persona_id,
+    shortTitle: (p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, ""),
+    accent: p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888",
+  }));
+}
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#08080c" />
+  <meta name="color-scheme" content="dark" />
+  <title>{username} — Identity Deck Embed</title>
+  <style is:global>
+    @import "../../styles/global.css";
+  </style>
+  <style>
+    body {
+      background: transparent;
+      margin: 0;
+      padding: 8px;
+    }
+
+    .embed-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    .embed-error {
+      text-align: center;
+      padding: 24px;
+      font-size: 10px;
+      color: #666;
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    }
+
+    .embed-footer {
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .embed-footer a {
+      font-size: 7px;
+      color: #444;
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+      text-decoration: none;
+    }
+
+    .embed-footer a:hover {
+      color: #888;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  {errorMessage && (
+    <div class="embed-error">{errorMessage}</div>
+  )}
+
+  {profileData && profileData.personas && (
+    <div class="embed-grid">
+      {profileData.personas.map((p: any) => {
+        const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
+        const stats = (p.stats || []).map((s: any) =>
+          Array.isArray(s) ? { label: s[0], value: s[1] } : s
+        );
+        return (
+          <PersonaCard
+            id={p.persona_id}
+            title={p.title}
+            shortTitle={(p.title || "").replace(/^(Principal|Staff|Crazy)\s+/, "")}
+            tagline={p.tagline}
+            accent={accent}
+            icon={p.icon}
+            experience={p.experience_label}
+            yearsActive={p.years_active}
+            stats={stats}
+            stack={p.stack || []}
+            details={p.details || []}
+            employers={p.employers || []}
+          />
+        );
+      })}
+    </div>
+  )}
+
+  {/* Persona Modals */}
+  {profileData && profileData.personas && profileData.personas.map((p: any) => {
+    const accent = p.accent_color || PERSONA_COLORS[p.persona_id]?.accent || "#888";
+    const stats = (p.stats || []).map((s: any) =>
+      Array.isArray(s) ? { label: s[0], value: s[1] } : s
+    );
+    return (
+      <PersonaModal
+        id={p.persona_id}
+        title={p.title}
+        tagline={p.tagline}
+        accent={accent}
+        icon={p.icon}
+        experience={p.experience_label}
+        yearsActive={p.years_active}
+        stats={stats}
+        stack={p.stack || []}
+        details={p.details || []}
+        employers={p.employers || []}
+        links={p.links || []}
+      />
+    );
+  })}
+
+  <div class="embed-footer">
+    <a href={`/${username}`} target="_blank" rel="noopener">View full Identity Deck &rarr;</a>
+  </div>
+
+  <script>
+    // Modal open
+    document.querySelectorAll('[data-persona-open]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.personaOpen;
+        const modal = document.getElementById(`persona-modal-${id}`);
+        if (modal) {
+          modal.classList.add('active');
+          document.body.style.overflow = 'hidden';
+        }
+      });
+    });
+
+    // Modal close
+    document.querySelectorAll('[data-modal-close]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const overlay = (btn as HTMLElement).closest('.modal-overlay');
+        if (overlay) {
+          overlay.classList.remove('active');
+          document.body.style.overflow = '';
+        }
+      });
+    });
+
+    // Close on backdrop click
+    document.querySelectorAll('.modal-overlay').forEach((overlay) => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove('active');
+          document.body.style.overflow = '';
+        }
+      });
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach((overlay) => {
+          overlay.classList.remove('active');
+        });
+        document.body.style.overflow = '';
+      }
+    });
+  </script>
+</body>
+</html>

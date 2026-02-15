@@ -1,0 +1,65 @@
+---
+interface Props {
+  name: string;
+  subtitle: string;
+  meta: string;
+  avatarUrl?: string;
+}
+
+const { name, subtitle, meta, avatarUrl } = Astro.props;
+---
+<header class="profile-header">
+  <div class="label">Identity Deck</div>
+  {avatarUrl && (
+    <img src={avatarUrl} alt={name} class="avatar" width="64" height="64" />
+  )}
+  <h1 class="name">{name}</h1>
+  <p class="subtitle">{subtitle}</p>
+  <p class="meta">{meta}</p>
+</header>
+
+<style>
+  .profile-header {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .label {
+    font-size: 10px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    color: #444;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 10px;
+  }
+
+  .name {
+    margin: 8px 0 0;
+    font-size: 36px;
+    font-weight: 200;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+
+  .subtitle {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #555;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+
+  .meta {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: #444;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+</style>
