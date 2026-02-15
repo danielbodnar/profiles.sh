@@ -2,12 +2,11 @@
  * GitHub API fetcher with KV caching and pagination.
  *
  * All requests use:
- *   - Authorization via GITHUB_TOKEN secret (5000 req/hour)
+ *   - Authorization via GITHUB_TOKEN secret (5000 req/hour) when available
+ *   - Falls back to unauthenticated requests (60 req/hour) if token is missing/invalid
  *   - User-Agent: IdentityDeck/1.0
  *   - Accept: application/vnd.github.v3+json
  *   - per_page=100 for paginated endpoints
- *
- * Reference: spec lines 856-903.
  */
 
 import type { GitHubProfile, GitHubRepo, StarsMeta } from "./types";
@@ -18,13 +17,36 @@ const USER_AGENT = "IdentityDeck/1.0";
 const PER_PAGE = 100;
 const MAX_STAR_PAGES = 30; // Cap at 3000 stars
 
+/** Track whether the token is known to be invalid (avoids repeated 401s). */
+let tokenInvalid = false;
+
 /** Build auth + accept headers for every GitHub request. */
-function githubHeaders(token: string): HeadersInit {
-  return {
-    Authorization: `token ${token}`,
+function githubHeaders(token?: string): HeadersInit {
+  const headers: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": USER_AGENT,
   };
+  if (token && !tokenInvalid) {
+    headers.Authorization = `token ${token}`;
+  }
+  return headers;
+}
+
+/** Make a GitHub API request, retrying without auth on 401. */
+async function githubFetch(
+  url: string,
+  token?: string,
+): Promise<Response> {
+  const res = await fetch(url, { headers: githubHeaders(token) });
+
+  if (res.status === 401 && token && !tokenInvalid) {
+    // Token is invalid — mark it and retry without auth
+    tokenInvalid = true;
+    console.warn("[github/client] GITHUB_TOKEN returned 401, falling back to unauthenticated requests");
+    return fetch(url, { headers: githubHeaders() });
+  }
+
+  return res;
 }
 
 /**
@@ -33,16 +55,17 @@ function githubHeaders(token: string): HeadersInit {
  */
 export async function fetchProfile(
   username: string,
-  env: { KV: KVNamespace; GITHUB_TOKEN: string },
+  env: { KV: KVNamespace; GITHUB_TOKEN?: string },
 ): Promise<GitHubProfile> {
   const cacheKey = `github:profile:${username}`;
 
   const cached = await getCached<GitHubProfile>(env.KV, cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(`${GITHUB_API}/users/${username}`, {
-    headers: githubHeaders(env.GITHUB_TOKEN),
-  });
+  const res = await githubFetch(
+    `${GITHUB_API}/users/${username}`,
+    env.GITHUB_TOKEN,
+  );
 
   if (res.status === 404) {
     throw new Error(`GitHub user not found: ${username}`);
@@ -66,7 +89,7 @@ export async function fetchProfile(
  */
 export async function fetchRepos(
   username: string,
-  env: { KV: KVNamespace; GITHUB_TOKEN: string },
+  env: { KV: KVNamespace; GITHUB_TOKEN?: string },
 ): Promise<GitHubRepo[]> {
   const cacheKey = `github:repos:${username}`;
 
@@ -77,9 +100,9 @@ export async function fetchRepos(
   let page = 1;
 
   while (true) {
-    const res = await fetch(
+    const res = await githubFetch(
       `${GITHUB_API}/users/${username}/repos?per_page=${PER_PAGE}&page=${page}&sort=pushed`,
-      { headers: githubHeaders(env.GITHUB_TOKEN) },
+      env.GITHUB_TOKEN,
     );
 
     if (res.status === 404) break;
@@ -105,11 +128,10 @@ export async function fetchRepos(
  * A metadata entry at github:stars:{username}:meta tracks overall state.
  *
  * Caps at 30 pages = 3000 stars to stay within Worker CPU limits.
- * Reference: spec lines 866-903.
  */
 export async function fetchAllStars(
   username: string,
-  env: { KV: KVNamespace; GITHUB_TOKEN: string },
+  env: { KV: KVNamespace; GITHUB_TOKEN?: string },
 ): Promise<GitHubRepo[]> {
   const stars: GitHubRepo[] = [];
   let page = 1;
@@ -120,9 +142,9 @@ export async function fetchAllStars(
     let data = await getCached<GitHubRepo[]>(env.KV, cacheKey);
 
     if (!data) {
-      const res = await fetch(
+      const res = await githubFetch(
         `${GITHUB_API}/users/${username}/starred?per_page=${PER_PAGE}&page=${page}`,
-        { headers: githubHeaders(env.GITHUB_TOKEN) },
+        env.GITHUB_TOKEN,
       );
 
       if (res.status === 404) break;

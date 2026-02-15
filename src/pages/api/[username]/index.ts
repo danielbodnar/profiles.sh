@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { processUsername } from '../../../lib/queue-consumer';
 
 /** Validate GitHub username: alphanumeric + hyphens, max 39 chars, no leading/trailing hyphens, no consecutive hyphens */
 function isValidUsername(username: string): boolean {
@@ -23,8 +24,8 @@ function jsonResponse(body: unknown, status = 200): Response {
  *
  * Returns the full computed profile for a GitHub user.
  * - If fresh (< 24h): returns full data joined across all tables.
- * - If stale: enqueues a background recompute and returns stale data with { stale: true }.
- * - If missing: enqueues a background compute and returns 202.
+ * - If stale: returns stale data (background refresh not available yet).
+ * - If missing: computes inline via GitHub API + engine, stores in D1, then returns.
  */
 export const GET: APIRoute = async ({ params, locals }) => {
   try {
@@ -44,29 +45,39 @@ export const GET: APIRoute = async ({ params, locals }) => {
       .first();
 
     if (!profile) {
-      // No profile at all — enqueue and return 202
-      await env.PROFILE_QUEUE.send({ username, requestedAt: Date.now() });
-      return jsonResponse(
-        {
-          status: 'computing',
-          username,
-          message: 'Profile is being computed. Please retry in a few seconds.',
-          eta: 15,
-        },
-        202
-      );
+      // No profile at all — compute inline (queue consumer not available)
+      try {
+        await processUsername(username, env);
+      } catch (err: any) {
+        console.error(`Inline computation failed for ${username}:`, err);
+        if (err?.message?.includes('not found')) {
+          return jsonResponse({ error: 'User not found on GitHub', username }, 404);
+        }
+        if (err?.message?.includes('rate limit')) {
+          return jsonResponse({ error: 'GitHub API rate limit exceeded. Try again later.', username }, 503);
+        }
+        return jsonResponse({ error: 'Failed to compute profile', username, detail: String(err?.message || err) }, 500);
+      }
+
+      // Profile now exists in D1 — fall through to the read path below
+    }
+
+    // ---- Re-fetch profile (may have just been computed above) ----
+    const currentProfile = profile || await env.DB.prepare(
+      'SELECT * FROM profiles WHERE username = ?'
+    )
+      .bind(username)
+      .first();
+
+    if (!currentProfile) {
+      return jsonResponse({ error: 'Profile computation failed', username }, 500);
     }
 
     // ---- Determine freshness ----
-    const computedAt = profile.computed_at as string | null;
+    const computedAt = currentProfile.computed_at as string | null;
     const isFresh =
       computedAt != null &&
       Date.now() - new Date(computedAt).getTime() < 24 * 60 * 60 * 1000;
-
-    if (!isFresh) {
-      // Stale — enqueue refresh in the background
-      await env.PROFILE_QUEUE.send({ username, requestedAt: Date.now() });
-    }
 
     // ---- Fetch related data ----
     const [personasResult, projectsResult, radarResult, interestsResult] =
@@ -122,19 +133,19 @@ export const GET: APIRoute = async ({ params, locals }) => {
 
     // Parse JSON in profile itself
     const rawProfile =
-      typeof profile.raw_profile === 'string'
-        ? JSON.parse(profile.raw_profile)
-        : profile.raw_profile;
+      typeof currentProfile.raw_profile === 'string'
+        ? JSON.parse(currentProfile.raw_profile)
+        : currentProfile.raw_profile;
 
     const responseBody: Record<string, unknown> = {
-      profile: { ...profile, raw_profile: rawProfile },
+      profile: { ...currentProfile, raw_profile: rawProfile },
       personas,
       projects,
       radar: radarAxes,
       interests: starInterests,
     };
 
-    if (!isFresh) {
+    if (!isFresh && profile) {
       responseBody.stale = true;
     }
 

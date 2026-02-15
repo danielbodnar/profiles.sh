@@ -7,11 +7,16 @@
     "directory": "dist",
     "binding": "ASSETS"
   },
-  "compatibility_date": "2026-02-14",
+  "compatibility_date": "2026-01-20",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1
+    }
   },
   "vars": {
     "ENVIRONMENT": "production"

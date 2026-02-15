@@ -1,96 +1,36 @@
 /**
- * OG image generation pipeline: SVG template -> PNG via satori + resvg-wasm.
- * Stores generated images in R2 with content-type metadata.
+ * OG image generation pipeline: SVG template -> R2 storage.
  *
- * Pipeline:
- *   1. Check R2 for an existing image (cache hit)
- *   2. Generate SVG string using the OG template
- *   3. Convert SVG to PNG using resvg-wasm
- *   4. Store the PNG in R2 with metadata
- *
- * Reference: spec lines 983-1006.
- *
- * NOTE: satori converts JSX/React-like elements to SVG, but since we already
- * produce raw SVG in template.ts, we use resvg-wasm directly for SVG->PNG.
- * If satori is needed in the future (e.g., for font rendering), it can be
- * added as an intermediate step.
+ * Generates an SVG OG image and stores it in R2 with content-type metadata.
+ * PNG conversion via resvg-wasm can be added later if needed.
  */
 
 import { renderOGTemplate } from "./template";
-import type { OGPersona, OGRadarAxis } from "./template";
+import type { OGPersona } from "./template";
 import type { ProfileRow, PersonaRow } from "../db/types";
-
-// resvg-wasm is lazily imported to allow the WASM module to be loaded once.
-// In Cloudflare Workers, WASM modules can be imported statically.
-// The consumer should ensure `@resvg/resvg-wasm` is installed.
-let resvgInitialized = false;
-
-/**
- * Initialize the resvg-wasm module. Call once before first render.
- * Safe to call multiple times (idempotent).
- */
-async function ensureResvgInitialized(): Promise<void> {
-  if (resvgInitialized) return;
-  try {
-    const { initWasm } = await import("@resvg/resvg-wasm");
-    // In Workers, the WASM binary is typically imported as a module.
-    // The init function may accept a URL, ArrayBuffer, or WebAssembly.Module.
-    // When bundled with wrangler, just calling initWasm() should work if the
-    // WASM file is correctly referenced in the build.
-    await initWasm();
-    resvgInitialized = true;
-  } catch {
-    // If resvg-wasm fails to init (e.g., missing dep), fall back to storing
-    // raw SVG. This allows the system to work in development without WASM.
-    console.warn("[og/generator] resvg-wasm initialization failed; PNG generation will be skipped.");
-  }
-}
-
-/**
- * Convert an SVG string to PNG bytes using resvg-wasm.
- * Returns null if resvg is unavailable.
- */
-async function svgToPng(svg: string): Promise<Uint8Array | null> {
-  await ensureResvgInitialized();
-
-  if (!resvgInitialized) return null;
-
-  try {
-    const { Resvg } = await import("@resvg/resvg-wasm");
-    const resvg = new Resvg(svg, {
-      fitTo: { mode: "width" as const, value: 1200 },
-    });
-    const pngData = resvg.render();
-    return pngData.asPng();
-  } catch (err) {
-    console.error("[og/generator] SVG to PNG conversion failed:", err);
-    return null;
-  }
-}
 
 /**
  * Generate (or retrieve cached) OG image for a profile.
  *
  * @param profile   - Profile row from D1
- * @param personas  - Persona rows from D1 (with id stripped is fine)
+ * @param personas  - Persona rows from D1
  * @param env       - Worker Env with R2 binding
- * @returns         - PNG bytes (Uint8Array) or SVG string as fallback
+ * @returns         - SVG string
  */
 export async function generateOGImage(
   profile: ProfileRow,
   personas: Array<Omit<PersonaRow, "id"> | PersonaRow>,
   env: { R2: R2Bucket },
-): Promise<Uint8Array | string> {
-  const key = `og/${profile.username}.png`;
+): Promise<string> {
+  const key = `og/${profile.username}.svg`;
 
-  // 1. Check R2 for existing image
+  // Check R2 for existing image
   const existing = await env.R2.get(key);
   if (existing) {
-    const arrayBuf = await existing.arrayBuffer();
-    return new Uint8Array(arrayBuf);
+    return await existing.text();
   }
 
-  // 2. Map PersonaRow to OGPersona
+  // Map PersonaRow to OGPersona
   const ogPersonas: OGPersona[] = personas.map((p) => ({
     persona_id: p.persona_id,
     title: p.title,
@@ -99,33 +39,18 @@ export async function generateOGImage(
     confidence: p.confidence,
   }));
 
-  // 3. Generate SVG
+  // Generate SVG
   const svg = renderOGTemplate(profile, ogPersonas);
 
-  // 4. Convert to PNG
-  const png = await svgToPng(svg);
-
-  if (png) {
-    // 5. Store PNG in R2
-    await env.R2.put(key, png, {
-      httpMetadata: { contentType: "image/png" },
-      customMetadata: {
-        username: profile.username,
-        generatedAt: new Date().toISOString(),
-      },
-    });
-    return png;
-  }
-
-  // Fallback: store SVG in R2 if PNG conversion is unavailable
-  const svgKey = `og/${profile.username}.svg`;
-  await env.R2.put(svgKey, svg, {
+  // Store in R2
+  await env.R2.put(key, svg, {
     httpMetadata: { contentType: "image/svg+xml" },
     customMetadata: {
       username: profile.username,
       generatedAt: new Date().toISOString(),
     },
   });
+
   return svg;
 }
 

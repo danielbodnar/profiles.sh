@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { checkRateLimit, consumeRateLimit } from '../../lib/rate-limiter';
+import { checkRateLimit, consumeRateLimit } from '../../../lib/rate-limiter';
 
 const USERNAME_RE = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i;
 

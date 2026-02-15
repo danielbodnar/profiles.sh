@@ -13,18 +13,32 @@ let profileData: any = null;
 let errorMessage = "";
 
 try {
-  const apiUrl = new URL(`/api/${encodeURIComponent(username)}`, Astro.url);
-  const resp = await fetch(apiUrl.toString());
+  const env = Astro.locals.runtime.env as Env;
+  const lowerUsername = username.toLowerCase();
 
-  if (resp.ok) {
-    profileData = await resp.json();
-  } else if (resp.status === 202) {
-    errorMessage = "Computing...";
-  } else {
+  const profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
+    .bind(lowerUsername).first();
+
+  if (!profile) {
     errorMessage = "Profile not found.";
+  } else {
+    const [personasResult] = await Promise.all([
+      env.DB.prepare('SELECT * FROM personas WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+    ]);
+
+    const personas = personasResult.results.map((p: any) => ({
+      ...p,
+      stats: typeof p.stats === 'string' ? JSON.parse(p.stats) : p.stats,
+      stack: typeof p.stack === 'string' ? JSON.parse(p.stack) : p.stack,
+      details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
+      employers: typeof p.employers === 'string' ? JSON.parse(p.employers) : p.employers,
+      links: typeof p.links === 'string' ? JSON.parse(p.links) : p.links,
+    }));
+
+    profileData = { personas };
   }
 } catch (e) {
-  errorMessage = "API unavailable.";
+  errorMessage = "Failed to load profile.";
 }
 
 // Build persona refs

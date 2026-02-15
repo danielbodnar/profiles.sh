@@ -62,7 +62,7 @@ export async function handleQueueBatch(
  * Full pipeline for a single username:
  *   GitHub fetch -> persona engine -> transform -> D1 persist -> OG image.
  */
-async function processUsername(username: string, env: Env): Promise<void> {
+export async function processUsername(username: string, env: Env): Promise<void> {
   // 1. Fetch GitHub data (cached in KV)
   const [githubProfile, repos, stars] = await Promise.all([
     fetchProfile(username, env),

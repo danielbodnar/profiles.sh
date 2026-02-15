@@ -10,6 +10,7 @@ import ProjectCard from "../../components/ProjectCard.astro";
 import ProjectModal from "../../components/ProjectModal.astro";
 import LoadingState from "../../components/LoadingState.astro";
 import { PERSONA_COLORS } from "../../styles/tokens";
+import { processUsername } from "../../lib/queue-consumer";
 
 const { username } = Astro.params;
 
@@ -17,26 +18,77 @@ if (!username) {
   return Astro.redirect("/");
 }
 
-// Fetch profile data from internal API
+// Access Cloudflare bindings directly (Workers can't self-fetch)
 let profileData: any = null;
 let isComputing = false;
 let errorMessage = "";
 
 try {
-  const apiUrl = new URL(`/api/${encodeURIComponent(username)}`, Astro.url);
-  const resp = await fetch(apiUrl.toString());
+  const env = Astro.locals.runtime.env as Env;
+  const lowerUsername = username.toLowerCase();
 
-  if (resp.status === 202) {
-    isComputing = true;
-  } else if (resp.ok) {
-    profileData = await resp.json();
-  } else if (resp.status === 404) {
-    errorMessage = `User "${username}" not found on GitHub.`;
-  } else {
-    errorMessage = `Failed to load profile (status ${resp.status}).`;
+  // Check D1 for existing profile
+  let profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
+    .bind(lowerUsername).first();
+
+  if (!profile) {
+    // Compute inline — fetch from GitHub, run engine, store in D1
+    try {
+      await processUsername(lowerUsername, env);
+      profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
+        .bind(lowerUsername).first();
+    } catch (err: any) {
+      if (err?.message?.includes('not found')) {
+        errorMessage = `User "${username}" not found on GitHub.`;
+      } else if (err?.message?.includes('rate limit')) {
+        errorMessage = "GitHub API rate limit exceeded. Please try again later.";
+      } else {
+        errorMessage = "Failed to compute profile. Please try again.";
+      }
+    }
   }
-} catch (e) {
-  errorMessage = "Failed to connect to the API. Please try again.";
+
+  if (profile && !errorMessage) {
+    // Fetch all related data from D1
+    const [personasResult, projectsResult, radarResult, interestsResult] = await Promise.all([
+      env.DB.prepare('SELECT * FROM personas WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+      env.DB.prepare('SELECT * FROM projects WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+      env.DB.prepare('SELECT * FROM radar_axes WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+      env.DB.prepare('SELECT * FROM star_interests WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+    ]);
+
+    // Parse JSON columns
+    const personas = personasResult.results.map((p: any) => ({
+      ...p,
+      stats: typeof p.stats === 'string' ? JSON.parse(p.stats) : p.stats,
+      stack: typeof p.stack === 'string' ? JSON.parse(p.stack) : p.stack,
+      details: typeof p.details === 'string' ? JSON.parse(p.details) : p.details,
+      starred_repos: typeof p.starred_repos === 'string' ? JSON.parse(p.starred_repos) : p.starred_repos,
+      employers: typeof p.employers === 'string' ? JSON.parse(p.employers) : p.employers,
+      links: typeof p.links === 'string' ? JSON.parse(p.links) : p.links,
+    }));
+
+    const projects = projectsResult.results.map((p: any) => ({
+      ...p,
+      tech: typeof p.tech === 'string' ? JSON.parse(p.tech) : p.tech,
+      persona_map: typeof p.persona_map === 'string' ? JSON.parse(p.persona_map) : p.persona_map,
+    }));
+
+    profileData = {
+      profile: {
+        ...profile,
+        raw_profile: typeof profile.raw_profile === 'string' ? JSON.parse(profile.raw_profile as string) : profile.raw_profile,
+      },
+      personas,
+      projects,
+      radar: radarResult.results,
+      interests: interestsResult.results,
+    };
+  }
+} catch (e: any) {
+  if (!errorMessage) {
+    errorMessage = "Failed to load profile. Please try again.";
+  }
 }
 
 // Helper: build radar axes from profile data
