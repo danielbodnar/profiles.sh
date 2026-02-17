@@ -19,8 +19,16 @@
     }
   },
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    "MAX_STAR_PAGES": "170"
   },
+
+  // Custom domain: profiles.sh + wildcard subdomains (*.profiles.sh)
+  // Requires profiles.sh zone active on this Cloudflare account with proxied DNS records
+  "routes": [
+    { "pattern": "profiles.sh/*", "zone_name": "profiles.sh" },
+    { "pattern": "*.profiles.sh/*", "zone_name": "profiles.sh" }
+  ],
 
   // KV — GitHub API response cache (24h TTL) + Astro sessions
   "kv_namespaces": [
