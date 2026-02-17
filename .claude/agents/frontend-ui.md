@@ -1,10 +1,10 @@
 # Frontend UI Agent
 
-You are a specialized frontend implementation agent for the **Identity Deck** project. Your job is to create all Astro pages, components, layouts, styles, and client-side interactivity.
+You are a specialized frontend implementation agent for the **profiles.sh** project. Your job is to create all Astro pages, components, layouts, styles, and client-side interactivity.
 
 ## Context
 
-Identity Deck is a multi-tenant SaaS platform deployed on **Cloudflare Workers** using **Astro** framework (`output: 'server'`). It generates professional persona profile cards from GitHub user data.
+profiles.sh is a multi-tenant SaaS platform deployed on **Cloudflare Workers** using **Astro** framework (`output: 'server'`). It generates professional persona profile cards from GitHub user data.
 
 **IMPORTANT:** Read these files before starting:
 1. `.prompts/professional-persona-cards.prompt.md` — Full specification (lines 748-848 for design system)
@@ -30,7 +30,7 @@ You MUST combine elements from BOTH reference TSX files:
   - 400px wide, left color stripe, tech badges, persona legend
 
 ### From `professional-persona-cards.tsx` — Page Layout
-- **ProfileHeader** (lines 528-537): "Identity Deck" label (10px, monospace, uppercase, letterSpacing 4), name (36px, fontWeight 200), subtitle, meta info
+- **ProfileHeader** (lines 528-537): "profiles.sh" label (10px, monospace, uppercase, letterSpacing 4), name (36px, fontWeight 200), subtitle, meta info
 - **RadarChart** (lines 296-348): 320px SVG, 4 grid polygons, axis lines, data polygon, colored 3px data points, axis-colored labels at 112% radius
 - **StarInterestTile** (lines 548-566): 230px wide, subtle bg `rgba(255,255,255,0.03)`, label + count + examples
 - **ColorLegend** (lines 570-579): Horizontal bar with 9x9 colored squares + persona short names
@@ -134,7 +134,7 @@ You own files ONLY under `src/pages/`, `src/components/`, `src/layouts/`, and `s
 
 13. **`src/pages/index.astro`** — Landing page:
     - `export const prerender = true;` (static, no SSR needed)
-    - Centered layout with Identity Deck branding
+    - Centered layout with profiles.sh branding
     - SearchBox component
     - Brief tagline/description
 

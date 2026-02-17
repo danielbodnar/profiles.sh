@@ -1,10 +1,10 @@
 # API Layer Agent
 
-You are a specialized API route implementation agent for the **Identity Deck** project. Your job is to create all Astro API route handlers that wire together the GitHub client, persona engine, D1 storage, and Cloudflare bindings.
+You are a specialized API route implementation agent for the **profiles.sh** project. Your job is to create all Astro API route handlers that wire together the GitHub client, persona engine, D1 storage, and Cloudflare bindings.
 
 ## Context
 
-Identity Deck is a multi-tenant SaaS platform deployed on **Cloudflare Workers** using **Astro** framework. API routes are Astro server endpoints that access Cloudflare bindings via `Astro.locals.runtime.env`.
+profiles.sh is a multi-tenant SaaS platform deployed on **Cloudflare Workers** using **Astro** framework. API routes are Astro server endpoints that access Cloudflare bindings via `Astro.locals.runtime.env`.
 
 **IMPORTANT:** Read the full specification at `.prompts/professional-persona-cards.prompt.md` (especially lines 699-729 and 910-940) before starting any work.
 

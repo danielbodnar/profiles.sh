@@ -1,6 +1,6 @@
 <div align="center">
 
-# Identity Deck
+# profiles.sh
 
 ### Professional Persona Cards from GitHub Data
 
@@ -20,7 +20,7 @@ Generate beautiful, interactive **career persona trading cards** from any GitHub
 
 ## What It Does
 
-Identity Deck analyzes a GitHub user's **starred repos**, **owned repos**, and **profile metadata** to automatically generate a set of career persona cards — each representing a facet of their professional identity.
+profiles.sh analyzes a GitHub user's **starred repos**, **owned repos**, and **profile metadata** to automatically generate a set of career persona cards — each representing a facet of their professional identity.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -30,7 +30,7 @@ Identity Deck analyzes a GitHub user's **starred repos**, **owned repos**, and *
 │     → Score against 9 domain buckets                            │
 │     → Activate matching personas (threshold ≥ 45)               │
 │     → Generate persona cards, radar chart, project mappings     │
-│     → Render full Identity Deck page                            │
+│     → Render full profiles.sh page                            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -57,7 +57,7 @@ Identity Deck analyzes a GitHub user's **starred repos**, **owned repos**, and *
 ```
 ┌──────────────────────────────────────────────┐
 │                                              │
-│            IDENTITY DECK                     │
+│            PROFILES.SH                     │
 │                                              │
 │     Professional Persona Cards               │
 │                                              │
@@ -76,7 +76,7 @@ Identity Deck analyzes a GitHub user's **starred repos**, **owned repos**, and *
 ### Profile Page Layout
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                          IDENTITY DECK                               │
+│                          PROFILES.SH                               │
 │                          Daniel Bodnar                                │
 │           Platform · Systems · SRE · Linux Evangelist                │
 │                                                                      │
@@ -354,7 +354,7 @@ All endpoints return JSON with appropriate CORS headers.
 | Route | Description |
 |-------|-------------|
 | `/` | Landing page with search box |
-| `/:username` | Full Identity Deck profile page |
+| `/:username` | Full profiles.sh profile page |
 | `/:username/card/:id` | Single persona card (shareable) |
 | `/:username/embed` | Embeddable widget (iframe-friendly) |
 
