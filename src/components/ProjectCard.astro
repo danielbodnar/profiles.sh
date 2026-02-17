@@ -1,6 +1,4 @@
 ---
-import { PERSONA_COLORS } from "../styles/tokens";
-
 interface PersonaRef {
   id: string;
   shortTitle: string;
@@ -18,11 +16,11 @@ interface Props {
 
 const { name, description, url, tech, personaMap, personas } = Astro.props;
 
-// Build stripe gradient from persona colors
+// Build stripe gradient from persona colors (lookup from personas prop, not static map)
 const stripeColors = personaMap
   .map((pid) => {
-    const p = PERSONA_COLORS[pid];
-    return p ? p.accent : "#888";
+    const found = personas.find((p) => p.id === pid);
+    return found?.accent ?? "#888";
   })
   .filter(Boolean);
 
