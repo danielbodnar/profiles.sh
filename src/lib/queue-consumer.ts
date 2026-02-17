@@ -19,6 +19,7 @@ import {
   upsertProjects,
   upsertRadarAxes,
   upsertStarInterests,
+  upsertAggregates,
 } from "./db/queries";
 import type { ProfileRow } from "./db/types";
 import { generateOGImage } from "./og/generator";
@@ -160,6 +161,15 @@ export async function processUsername(
     sort_order: i,
   }));
 
+  const aggregateRows = computed.aggregates.map((a, i) => ({
+    agg_type: a.type,
+    item: a.item,
+    count: a.count,
+    from_owned: a.fromOwned,
+    from_starred: a.fromStarred,
+    sort_order: i,
+  }));
+
   // 7. Write everything to D1 (skip gracefully if DB unavailable)
   if (env.DB) {
     try {
@@ -169,6 +179,7 @@ export async function processUsername(
         upsertProjects(env.DB, username, projectRows),
         upsertRadarAxes(env.DB, username, radarRows),
         upsertStarInterests(env.DB, username, interestRows),
+        upsertAggregates(env.DB, username, aggregateRows),
       ]);
     } catch (err) {
       console.warn(`[queue-consumer] D1 write failed for ${username}:`, err);

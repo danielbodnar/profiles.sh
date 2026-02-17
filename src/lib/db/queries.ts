@@ -12,6 +12,7 @@ import type {
   ProjectRow,
   RadarAxisRow,
   StarInterestRow,
+  AggregateRow,
   CustomizationRow,
   FullProfile,
 } from "./types";
@@ -258,6 +259,44 @@ export async function upsertStarInterests(
 }
 
 // ---------------------------------------------------------------------------
+// user_aggregates
+// ---------------------------------------------------------------------------
+
+export async function getAggregates(
+  db: D1Database,
+  username: string,
+): Promise<AggregateRow[]> {
+  const result = await db
+    .prepare(
+      "SELECT * FROM user_aggregates WHERE username = ? ORDER BY agg_type ASC, sort_order ASC",
+    )
+    .bind(username)
+    .all<AggregateRow>();
+  return result.results;
+}
+
+export async function upsertAggregates(
+  db: D1Database,
+  username: string,
+  aggregates: Omit<AggregateRow, "username">[],
+): Promise<void> {
+  await db
+    .prepare("DELETE FROM user_aggregates WHERE username = ?")
+    .bind(username)
+    .run();
+
+  for (const a of aggregates) {
+    await db
+      .prepare(
+        `INSERT INTO user_aggregates (username, agg_type, item, count, from_owned, from_starred, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(username, a.agg_type, a.item, a.count, a.from_owned, a.from_starred, a.sort_order)
+      .run();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // customizations
 // ---------------------------------------------------------------------------
 
@@ -311,12 +350,13 @@ export async function getFullProfile(
   const profile = await getProfile(db, username);
   if (!profile) return null;
 
-  const [personas, projects, radarAxes, starInterests, customizations] =
+  const [personas, projects, radarAxes, starInterests, aggregates, customizations] =
     await Promise.all([
       getPersonas(db, username),
       getProjects(db, username),
       getRadarAxes(db, username),
       getStarInterests(db, username),
+      getAggregates(db, username),
       getCustomizations(db, username),
     ]);
 
@@ -326,6 +366,7 @@ export async function getFullProfile(
     projects,
     radarAxes,
     starInterests,
+    aggregates,
     customizations,
   };
 }

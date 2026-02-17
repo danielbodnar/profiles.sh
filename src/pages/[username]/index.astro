@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import ProfileHeader from "../../components/ProfileHeader.astro";
 import RadarChart from "../../components/RadarChart.astro";
+import AggregateChart from "../../components/AggregateChart.astro";
 import StarInterestTile from "../../components/StarInterestTile.astro";
 import ColorLegend from "../../components/ColorLegend.astro";
 import PersonaCard from "../../components/PersonaCard.astro";
@@ -11,6 +12,7 @@ import ProjectModal from "../../components/ProjectModal.astro";
 import LoadingState from "../../components/LoadingState.astro";
 import { PERSONA_COLORS } from "../../styles/tokens";
 import { processUsername } from "../../lib/queue-consumer";
+import { parseProfileParams } from "../../lib/query-params";
 
 const { username } = Astro.params;
 
@@ -18,8 +20,12 @@ if (!username) {
   return Astro.redirect("/");
 }
 
+// Parse query params for featuring & refresh
+const queryParams = parseProfileParams(Astro.url);
+
 // Access Cloudflare bindings directly (Workers can't self-fetch)
 let profileData: any = null;
+let aggregates: any[] = [];
 let isComputing = false;
 let errorMessage = "";
 
@@ -31,8 +37,8 @@ try {
   let profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
     .bind(lowerUsername).first();
 
-  if (!profile) {
-    // Compute inline — fetch from GitHub, run engine, store in D1
+  // Force re-compute if ?refresh=true or no profile exists
+  if (!profile || queryParams.refresh) {
     try {
       await processUsername(lowerUsername, env);
       profile = await env.DB.prepare('SELECT * FROM profiles WHERE username = ?')
@@ -49,12 +55,13 @@ try {
   }
 
   if (profile && !errorMessage) {
-    // Fetch all related data from D1
-    const [personasResult, projectsResult, radarResult, interestsResult] = await Promise.all([
+    // Fetch all related data from D1 (including aggregates)
+    const [personasResult, projectsResult, radarResult, interestsResult, aggregatesResult] = await Promise.all([
       env.DB.prepare('SELECT * FROM personas WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
       env.DB.prepare('SELECT * FROM projects WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
       env.DB.prepare('SELECT * FROM radar_axes WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
       env.DB.prepare('SELECT * FROM star_interests WHERE username = ? ORDER BY sort_order ASC').bind(lowerUsername).all(),
+      env.DB.prepare('SELECT * FROM user_aggregates WHERE username = ? ORDER BY agg_type ASC, sort_order ASC').bind(lowerUsername).all(),
     ]);
 
     // Parse JSON columns
@@ -74,6 +81,8 @@ try {
       persona_map: typeof p.persona_map === 'string' ? JSON.parse(p.persona_map) : p.persona_map,
     }));
 
+    aggregates = aggregatesResult.results as any[];
+
     profileData = {
       profile: {
         ...profile,
@@ -91,7 +100,10 @@ try {
   }
 }
 
-// Helper: build radar axes from profile data
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function buildRadarAxes(profile: any) {
   if (!profile?.radar) return [];
   return profile.radar.map((r: any) => ({
@@ -101,7 +113,6 @@ function buildRadarAxes(profile: any) {
   }));
 }
 
-// Helper: build subtitle from persona titles
 function buildSubtitle(profile: any): string {
   if (!profile?.personas) return "";
   return profile.personas
@@ -113,17 +124,13 @@ function buildSubtitle(profile: any): string {
     .join(" \u00B7 ");
 }
 
-// Helper: build meta string
 function buildMeta(profile: any): string {
   const parts: string[] = [];
-  if (profile?.profile?.email) parts.push(profile.profile.email);
   if (profile?.profile?.location) parts.push(profile.profile.location);
   if (profile?.profile?.username) parts.push(`github.com/${profile.profile.username}`);
-  if (profile?.profile?.public_repos) parts.push(`${profile.profile.public_repos} repos`);
   return parts.join(" \u00B7 ");
 }
 
-// Helper: build persona refs for ProjectCard
 function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accent: string }[] {
   if (!profile?.personas) return [];
   return profile.personas.map((p: any) => ({
@@ -133,10 +140,103 @@ function buildPersonaRefs(profile: any): { id: string; shortTitle: string; accen
   }));
 }
 
+function formatCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+// GitHub language colors (top languages)
+const LANG_COLORS: Record<string, string> = {
+  rust: "#dea584",
+  typescript: "#3178c6",
+  javascript: "#f1e05a",
+  python: "#3572a5",
+  go: "#00add8",
+  java: "#b07219",
+  "c++": "#f34b7d",
+  c: "#555555",
+  ruby: "#701516",
+  swift: "#f05138",
+  kotlin: "#a97bff",
+  lua: "#000080",
+  shell: "#89e051",
+  nushell: "#3aa675",
+  zig: "#ec915c",
+  haskell: "#5e5086",
+  nix: "#7e7eff",
+  vue: "#41b883",
+  svelte: "#ff3e00",
+  astro: "#ff5d01",
+  html: "#e34c26",
+  css: "#563d7c",
+  scss: "#c6538c",
+};
+
+// ---------------------------------------------------------------------------
+// Computed values
+// ---------------------------------------------------------------------------
+
 const radarAxes = profileData ? buildRadarAxes(profileData) : [];
 const subtitle = profileData ? buildSubtitle(profileData) : "";
 const meta = profileData ? buildMeta(profileData) : "";
 const personaRefs = profileData ? buildPersonaRefs(profileData) : [];
+
+// Compute stats for badges
+const reposAnalyzed = profileData?.projects?.length ?? 0;
+const starsAnalyzed = aggregates
+  .filter((a: any) => a.agg_type === "language")
+  .reduce((sum: number, a: any) => sum + (a.from_starred || 0), 0);
+const memberSince = profileData?.profile?.created_at
+  ? new Date(profileData.profile.created_at).getFullYear()
+  : null;
+
+const badges = profileData ? [
+  { label: "repos analyzed", value: String(reposAnalyzed) },
+  ...(starsAnalyzed > 0 ? [{ label: "stars analyzed", value: formatCount(starsAnalyzed) }] : []),
+  ...(profileData.profile?.followers ? [{ label: "followers", value: formatCount(profileData.profile.followers) }] : []),
+  ...(memberSince ? [{ label: "member since", value: String(memberSince) }] : []),
+] : [];
+
+// Group aggregates by type
+const aggByType: Record<string, any[]> = {};
+for (const a of aggregates) {
+  const t = (a as any).agg_type;
+  if (!aggByType[t]) aggByType[t] = [];
+  aggByType[t].push(a);
+}
+
+// Top languages and topics for pills
+const topLanguages = (aggByType["language"] || []).slice(0, 5).map((a: any) => ({
+  name: a.item,
+  color: LANG_COLORS[a.item.toLowerCase()] || undefined,
+}));
+
+const topTopics = (aggByType["topic"] || []).slice(0, 5).map((a: any) => ({
+  name: a.item,
+}));
+
+// Aggregate chart data
+const chartSections = [
+  { key: "language", title: "Languages" },
+  { key: "framework", title: "Frameworks" },
+  { key: "topic", title: "Topics" },
+  { key: "tooling", title: "Tooling" },
+].filter((s) => (aggByType[s.key] || []).length > 0);
+
+// Apply query param featuring to projects
+let displayProjects = profileData?.projects || [];
+if (queryParams.featuredRepos.length > 0) {
+  const featured = new Set(queryParams.featuredRepos);
+  displayProjects = [
+    ...displayProjects.filter((p: any) => featured.has(p.name?.toLowerCase())),
+    ...displayProjects.filter((p: any) => !featured.has(p.name?.toLowerCase())),
+  ];
+}
+
+// Apply query param featuring to star interests
+const featuredStarsSet = new Set(queryParams.featuredStars);
+const featuredTopicsSet = new Set(queryParams.featuredTopics);
+const featuredOrgsSet = new Set(queryParams.featuredOrgs);
 
 const pageTitle = profileData?.profile?.display_name
   ? `${profileData.profile.display_name} — profiles.sh`
@@ -163,12 +263,15 @@ const pageDesc = profileData?.profile?.display_name
 
   {profileData && !isComputing && !errorMessage && (
     <main class="profile-page">
-      {/* Profile Header */}
+      {/* Profile Header with badges and tag pills */}
       <ProfileHeader
         name={profileData.profile?.display_name || username}
         subtitle={subtitle}
         meta={meta}
         avatarUrl={profileData.profile?.avatar_url}
+        badges={badges}
+        languages={topLanguages}
+        topics={topTopics}
       />
 
       {/* Radar Chart */}
@@ -176,17 +279,39 @@ const pageDesc = profileData?.profile?.display_name
         <RadarChart axes={radarAxes} size={320} />
       )}
 
+      {/* Aggregate Charts (2x2 grid) */}
+      {chartSections.length > 0 && (
+        <section class="aggregates-section">
+          <div class="aggregates-grid">
+            {chartSections.map((s) => (
+              <AggregateChart
+                title={s.title}
+                items={(aggByType[s.key] || []).map((a: any) => ({
+                  name: a.item,
+                  count: a.count,
+                  color: s.key === "language" ? LANG_COLORS[a.item.toLowerCase()] : undefined,
+                }))}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Star Interests */}
       {profileData.interests && profileData.interests.length > 0 && (
         <section class="interests-section">
           <div class="interests-grid">
-            {profileData.interests.map((si: any) => (
-              <StarInterestTile
-                label={si.label}
-                count={si.count}
-                examples={si.examples}
-              />
-            ))}
+            {profileData.interests.map((si: any) => {
+              const label = si.label?.toLowerCase() || "";
+              const isFeatured = featuredStarsSet.size > 0 && featuredStarsSet.has(label);
+              return (
+                <StarInterestTile
+                  label={si.label}
+                  count={si.count}
+                  examples={si.examples}
+                />
+              );
+            })}
           </div>
         </section>
       )}
@@ -233,7 +358,7 @@ const pageDesc = profileData?.profile?.display_name
       )}
 
       {/* Featured Projects Section */}
-      {profileData.projects && profileData.projects.length > 0 && (
+      {displayProjects.length > 0 && (
         <section class="projects-section">
           <div class="section-header">
             <div class="section-label">Featured Projects</div>
@@ -241,16 +366,24 @@ const pageDesc = profileData?.profile?.display_name
             <p class="section-sub">color-coded by persona affinity</p>
           </div>
           <div class="project-grid">
-            {profileData.projects.map((proj: any) => (
-              <ProjectCard
-                name={proj.name}
-                description={proj.description}
-                url={proj.url}
-                tech={proj.tech || []}
-                personaMap={proj.persona_map || []}
-                personas={personaRefs}
-              />
-            ))}
+            {displayProjects.map((proj: any) => {
+              const isFeatured = queryParams.featuredRepos.includes(proj.name?.toLowerCase());
+              const isOrgFeatured = featuredOrgsSet.size > 0 && proj.url && featuredOrgsSet.has(
+                new URL(proj.url).pathname.split("/")[1]?.toLowerCase()
+              );
+              return (
+                <div class:list={["project-wrapper", { featured: isFeatured || isOrgFeatured }]}>
+                  <ProjectCard
+                    name={proj.name}
+                    description={proj.description}
+                    url={proj.url}
+                    tech={proj.tech || []}
+                    personaMap={proj.persona_map || []}
+                    personas={personaRefs}
+                  />
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
@@ -280,7 +413,7 @@ const pageDesc = profileData?.profile?.display_name
       })}
 
       {/* Project Modals (hidden by default) */}
-      {profileData.projects && profileData.projects.map((proj: any) => (
+      {displayProjects.map((proj: any) => (
         <ProjectModal
           name={proj.name}
           description={proj.description}
@@ -290,6 +423,14 @@ const pageDesc = profileData?.profile?.display_name
           personas={personaRefs}
         />
       ))}
+
+      {/* Export */}
+      <div class="export-bar">
+        <span class="export-label">Export</span>
+        <a href={`/${username}/export/json`} class="export-btn" download>JSON</a>
+        <a href={`/${username}/export/md`} class="export-btn" download>Markdown</a>
+        <a href={`/${username}/export/png`} class="export-btn" download>Image</a>
+      </div>
 
       {/* Footer */}
       <footer class="profile-footer">
@@ -354,6 +495,19 @@ const pageDesc = profileData?.profile?.display_name
       document.body.style.overflow = '';
     }
   });
+
+  // Highlight featured topic pills from query params
+  const url = new URL(window.location.href);
+  const featuredTopics = (url.searchParams.get('featured-topics') || '')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (featuredTopics.length > 0) {
+    document.querySelectorAll('.pill-topic[data-topic]').forEach((pill) => {
+      const topic = (pill as HTMLElement).dataset.topic || '';
+      if (featuredTopics.includes(topic)) {
+        pill.classList.add('featured');
+      }
+    });
+  }
 </script>
 
 <style>
@@ -410,6 +564,17 @@ const pageDesc = profileData?.profile?.display_name
     color: #aaa;
   }
 
+  .aggregates-section {
+    max-width: 60rem;
+    margin: 0 auto 40px;
+  }
+
+  .aggregates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: 1rem;
+  }
+
   .interests-section {
     max-width: 47.5rem;
     margin: 0 auto 40px;
@@ -427,7 +592,7 @@ const pageDesc = profileData?.profile?.display_name
 
   .persona-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: 0.5rem;
   }
 
@@ -466,6 +631,45 @@ const pageDesc = profileData?.profile?.display_name
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
     gap: 1.125rem;
+  }
+
+  .project-wrapper.featured {
+    border: 1px solid rgba(255, 200, 50, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 0 12px rgba(255, 200, 50, 0.08);
+  }
+
+  .export-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 48px;
+  }
+
+  .export-label {
+    font-size: 0.8125rem;
+    color: #444;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .export-btn {
+    font-size: 0.8125rem;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    color: #888;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .export-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ccc;
   }
 
   .profile-footer {

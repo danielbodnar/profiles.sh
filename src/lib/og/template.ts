@@ -92,7 +92,7 @@ export function renderOGTemplate(
 
   <!-- Branding -->
   <text x="80" y="110" fill="#ffffff" font-size="14" font-family="monospace"
-        letter-spacing="4" opacity="0.5" text-transform="uppercase">IDENTITY DECK</text>
+        letter-spacing="4" opacity="0.5" text-transform="uppercase">PROFILES.SH</text>
 
   <!-- Avatar placeholder (circle) -->
   <circle cx="120" cy="200" r="45" fill="#ffffff10" stroke="#ffffff20" stroke-width="1.5"/>

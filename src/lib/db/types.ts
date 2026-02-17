@@ -80,6 +80,17 @@ export interface StarInterestRow {
   sort_order: number | null;
 }
 
+/** Row from the `user_aggregates` table */
+export interface AggregateRow {
+  username: string;
+  agg_type: string;
+  item: string;
+  count: number;
+  from_owned: number;
+  from_starred: number;
+  sort_order: number;
+}
+
 /** Row from the `customizations` table */
 export interface CustomizationRow {
   username: string;
@@ -100,5 +111,6 @@ export interface FullProfile {
   projects: ProjectRow[];
   radarAxes: RadarAxisRow[];
   starInterests: StarInterestRow[];
+  aggregates: AggregateRow[];
   customizations: CustomizationRow | null;
 }
