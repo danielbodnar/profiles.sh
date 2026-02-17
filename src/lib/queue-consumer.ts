@@ -220,8 +220,9 @@ export async function processUsername(
   // 6b. Apply gist config overrides (if user has a profiles-sh.json gist)
   if (gistConfig) {
     personaRows = applyPersonaOverrides(personaRows, gistConfig);
+    // Re-assign sort_order after filtering/reordering
+    personaRows = personaRows.map((p, i) => ({ ...p, sort_order: i }));
     projectRows = applyProjectOverrides(projectRows, gistConfig);
-    // Re-assign sort_order after reordering
     projectRows = projectRows.map((p, i) => ({ ...p, sort_order: i }));
   }
 
