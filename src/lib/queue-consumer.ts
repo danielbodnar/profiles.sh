@@ -124,7 +124,13 @@ export async function processUsername(
   }
 
   // 3. Run persona engine (deterministic — no AI/LLM)
-  const computed = computeFullProfile(githubProfile, repos, stars);
+  const computed = computeFullProfile(
+    githubProfile,
+    repos,
+    stars,
+    undefined, // use default categories
+    gistConfig?.featured_topics,
+  );
 
   // 4. Build a simple hash of raw data to detect changes on next run
   const githubDataHash = simpleHash(

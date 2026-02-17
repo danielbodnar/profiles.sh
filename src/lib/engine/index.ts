@@ -100,13 +100,14 @@ export function computeFullProfile(
   ownedRepos: RepoData[],
   stars: RepoData[],
   categories: Category[] = CATEGORY_SEEDS,
+  featuredTopics?: string[],
 ): FullProfile {
   // Step 1a: Owned-only scores — drives persona identity (what you build)
-  const ownedRawScores = computeOwnedRepoScores(ownedRepos, categories);
+  const ownedRawScores = computeOwnedRepoScores(ownedRepos, categories, featuredTopics);
   const ownedNormalized = normalizeToRadar(ownedRawScores);
 
   // Step 1b: Combined scores — drives radar chart (full footprint)
-  const combinedRawScores = computeCategoryScores(stars, ownedRepos, categories);
+  const combinedRawScores = computeCategoryScores(stars, ownedRepos, categories, featuredTopics);
   const combinedNormalized = normalizeToRadar(combinedRawScores);
 
   // Step 3: Determine active personas from OWNED scores only
