@@ -1,0 +1,206 @@
+---
+import Base from "../../layouts/Base.astro";
+---
+
+<Base
+  title="Self-Hosted Setup — profiles.sh"
+  description="Install the profiles.sh GitHub App to self-host your persona cards"
+>
+  <main class="setup-page">
+    <div class="container">
+      <h1>Self-Hosted Persona Cards</h1>
+      <p class="subtitle">
+        Own your profile data by running the persona engine in your own GitHub repo.
+      </p>
+
+      <section class="steps">
+        <div class="step">
+          <span class="step-number">1</span>
+          <div>
+            <h2>Install the GitHub App</h2>
+            <p>
+              Click the button below to install the <strong>profiles-sh</strong>
+              GitHub App. It will create a <code>persona-cards</code> repository
+              in your account with a pre-configured Actions workflow.
+            </p>
+            <a
+              id="install-btn"
+              class="btn"
+              href="https://github.com/apps/profiles-sh/installations/new"
+              target="_blank"
+              rel="noopener"
+            >
+              Install GitHub App
+            </a>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-number">2</span>
+          <div>
+            <h2>Automatic Profile Generation</h2>
+            <p>
+              The workflow runs <strong>weekly</strong> and on
+              <strong>manual dispatch</strong>. It fetches your public GitHub
+              data and produces <code>profile.json</code> and
+              <code>index.html</code>.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-number">3</span>
+          <div>
+            <h2>Enable GitHub Pages</h2>
+            <p>
+              Go to your repo's <strong>Settings → Pages</strong> and set the
+              source to the <code>main</code> branch. Your profile will be
+              available at:
+            </p>
+            <code class="url-preview">username.github.io/persona-cards</code>
+          </div>
+        </div>
+      </section>
+
+      <section class="details">
+        <h2>How It Works</h2>
+        <ul>
+          <li>
+            <strong>No AI / LLM</strong> — scoring is 100% deterministic using
+            language, topic, and keyword matching.
+          </li>
+          <li>
+            <strong>You own the data</strong> — profile.json lives in your repo
+            and can be consumed by any service.
+          </li>
+          <li>
+            <strong>Customizable</strong> — edit <code>generate.mjs</code> to
+            tweak scoring weights or the HTML template.
+          </li>
+          <li>
+            <strong>Works offline</strong> — your profile is available via
+            GitHub Pages even if profiles.sh is down.
+          </li>
+        </ul>
+      </section>
+
+      <section class="details">
+        <h2>Manual Setup</h2>
+        <p>
+          Prefer not to use the GitHub App? See the
+          <a href="https://github.com/danielbodnar/professional-persona-cards/blob/main/docs/self-hosted.md">
+            self-hosted documentation
+          </a>
+          for step-by-step instructions.
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <style>
+    .setup-page {
+      min-height: 100vh;
+      padding: 3rem 1.5rem;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: #a3a3a3;
+      margin-bottom: 2.5rem;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+    .step {
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: #1a1a2e;
+      color: #818cf8;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step h2 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .step p {
+      color: #a3a3a3;
+      line-height: 1.6;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.625rem 1.25rem;
+      background: #4f46e5;
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #4338ca;
+    }
+    code {
+      background: #1e1e2e;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.875em;
+    }
+    .url-preview {
+      display: block;
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: #111;
+      border: 1px solid #262626;
+      border-radius: 6px;
+      color: #818cf8;
+    }
+    .details {
+      margin-bottom: 2rem;
+    }
+    .details h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .details ul {
+      list-style: none;
+      padding: 0;
+    }
+    .details li {
+      padding: 0.4rem 0;
+      color: #a3a3a3;
+      line-height: 1.6;
+    }
+    .details li::before {
+      content: "→ ";
+      color: #4f46e5;
+    }
+    .details a {
+      color: #818cf8;
+      text-decoration: underline;
+    }
+  </style>
+</Base>
