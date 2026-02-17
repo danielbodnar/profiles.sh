@@ -116,6 +116,35 @@ export function normalizeToRadar(
 }
 
 /**
+ * Compute category scores from owned repos only (no star influence).
+ *
+ * Used for persona determination — personas represent what you BUILD,
+ * not what you star. Stars drive interests separately.
+ */
+export function computeOwnedRepoScores(
+  ownedRepos: RepoData[],
+  categories: Category[] = CATEGORY_SEEDS,
+): Record<string, number> {
+  const scores: Record<string, number> = {};
+  for (const cat of categories) {
+    scores[cat.id] = 0;
+  }
+
+  for (const repo of ownedRepos) {
+    const lang = (repo.language || "").toLowerCase();
+    const topics = (repo.topics || []).map((t) => t.toLowerCase());
+    const desc = (repo.description || "").toLowerCase();
+    const name = (repo.full_name || "").toLowerCase();
+
+    for (const cat of categories) {
+      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat);
+    }
+  }
+
+  return scores;
+}
+
+/**
  * @deprecated Use computeCategoryScores instead.
  * Kept for backward compatibility during transition.
  */
