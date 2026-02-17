@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 .wrangler/
 .dev.vars
 worker-configuration.d.ts
+.claude/sessions/*.md
