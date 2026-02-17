@@ -6,6 +6,9 @@ import { defineMiddleware } from "astro:middleware";
 const RESERVED = new Set(["www", "api", "cdn", "static"]);
 const PRODUCTION_DOMAIN = "profiles.sh";
 
+// GitHub usernames: alphanumeric + hyphens, max 39 chars, no leading/trailing hyphens
+const GITHUB_USERNAME_RE = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/;
+
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const url = new URL(ctx.request.url);
 
@@ -21,7 +24,7 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   // Reserved subdomains (www, api, cdn, static) pass through to standard routing
   if (parts.length >= 3) {
     const sub = parts[0].toLowerCase();
-    if (!RESERVED.has(sub) && sub.length > 0) {
+    if (!RESERVED.has(sub) && GITHUB_USERNAME_RE.test(sub)) {
       ctx.locals.subdomainUsername = sub;
 
       // Rewrite root to /{username}

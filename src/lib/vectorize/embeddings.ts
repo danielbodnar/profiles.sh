@@ -47,3 +47,17 @@ export async function generateEmbedding(
   if (!data?.[0]) throw new Error("Empty embedding result from Workers AI");
   return data[0];
 }
+
+/** Generate embeddings for multiple texts in a single Workers AI call. */
+export async function generateEmbeddings(
+  ai: Ai,
+  texts: string[],
+): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  const result = await ai.run(MODEL, { text: texts });
+  const data = (result as { data: number[][] }).data;
+  if (!data || data.length !== texts.length) {
+    throw new Error(`Expected ${texts.length} embeddings, got ${data?.length ?? 0}`);
+  }
+  return data;
+}

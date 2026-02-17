@@ -102,6 +102,7 @@ export async function processUsername(
           return { fullName: repo.full_name, readme };
         },
         5,
+        "README fetch",
       );
       for (const { fullName, readme } of readmeResults) {
         if (readme) readmeMap.set(fullName, readme);
@@ -256,14 +257,24 @@ async function batchProcess<T, R>(
   items: T[],
   fn: (item: T) => Promise<R>,
   concurrency: number,
+  label = "batchProcess",
 ): Promise<R[]> {
   const results: R[] = [];
+  let failures = 0;
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
     const settled = await Promise.allSettled(batch.map(fn));
     for (const r of settled) {
-      if (r.status === "fulfilled") results.push(r.value);
+      if (r.status === "fulfilled") {
+        results.push(r.value);
+      } else {
+        failures++;
+        console.warn(`[queue-consumer] ${label} item failed:`, r.reason);
+      }
     }
+  }
+  if (failures > 0) {
+    console.warn(`[queue-consumer] ${label}: ${failures}/${items.length} items failed`);
   }
   return results;
 }

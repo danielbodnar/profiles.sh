@@ -1,8 +1,10 @@
 import type { APIRoute } from "astro";
 import { searchRepos } from "../../../lib/vectorize/search";
 
+const MAX_QUERY_LENGTH = 500;
+
 const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://profiles.sh",
   "Access-Control-Allow-Methods": "GET",
   "Cache-Control": "public, max-age=60",
 };
@@ -29,6 +31,10 @@ export const GET: APIRoute = async ({ params, url, locals }) => {
   const query = url.searchParams.get("q")?.trim();
   if (!query) {
     return jsonResponse({ error: "Query parameter 'q' is required" }, 400);
+  }
+
+  if (query.length > MAX_QUERY_LENGTH) {
+    return jsonResponse({ error: `Query too long (max ${MAX_QUERY_LENGTH} chars)` }, 400);
   }
 
   const topK = Math.min(Number(url.searchParams.get("limit")) || 20, 50);

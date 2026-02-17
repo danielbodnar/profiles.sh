@@ -249,13 +249,17 @@ export async function fetchStarsIncremental(
 
       newRepos.push(entry.repo);
       newRefs.push(entry.repo.full_name);
-
-      // Write repo object to R2 (frontmatter only, no README yet)
-      await putRepoObject(env.R2, entry.repo);
     }
 
     if (entries.length < perPage) break;
     page++;
+  }
+
+  // 2b. Write new repo objects to R2 in parallel batches (frontmatter only, no README yet)
+  const r2BatchSize = 50;
+  for (let i = 0; i < newRepos.length; i += r2BatchSize) {
+    const batch = newRepos.slice(i, i + r2BatchSize);
+    await Promise.allSettled(batch.map((repo) => putRepoObject(env.R2!, repo)));
   }
 
   console.log(
