@@ -103,6 +103,18 @@ export function computeFullProfile(
 ): FullProfile {
   // Step 1a: Owned-only scores — drives persona identity (what you build)
   const ownedRawScores = computeOwnedRepoScores(ownedRepos, categories);
+
+  // Floor weak signals: require meaningful evidence across multiple signals
+  // or multiple repos. A single topic match (3 pts) or language match (2 pts)
+  // alone shouldn't create a persona. Threshold 4 requires combinations like:
+  //   - 2 repos with same language (2+2=4)
+  //   - language + topic match (2+3=5)
+  //   - topic + keyword matches (3+1.5=4.5)
+  const MIN_RAW_SCORE = 4;
+  for (const id of Object.keys(ownedRawScores)) {
+    if (ownedRawScores[id] < MIN_RAW_SCORE) ownedRawScores[id] = 0;
+  }
+
   const ownedNormalized = normalizeToRadar(ownedRawScores);
 
   // Step 1b: Combined scores — drives radar chart (full footprint)

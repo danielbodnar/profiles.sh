@@ -11,6 +11,18 @@ export interface RepoData {
   html_url?: string;
 }
 
+/**
+ * Check if two topic strings are a meaningful match.
+ * Short tokens (< 3 chars) require exact match to avoid false positives
+ * like category topic "r" matching any repo topic containing the letter "r".
+ * Longer tokens use bidirectional substring matching.
+ */
+function topicsMatch(repoTopic: string, catTopic: string): boolean {
+  if (repoTopic === catTopic) return true;
+  if (repoTopic.length < 3 || catTopic.length < 3) return false;
+  return repoTopic.includes(catTopic) || catTopic.includes(repoTopic);
+}
+
 /** Score a single repo against a single category's signals. */
 function scoreRepo(
   lang: string,
@@ -26,18 +38,24 @@ function scoreRepo(
     score += 2;
   }
 
-  // Topic match: +3 points per matching topic (fuzzy: bidirectional includes)
+  // Topic match: +3 points per matching topic
   const topicMatches = topics.filter((t) =>
-    cat.topics.some((st) => t.includes(st) || st.includes(t)),
+    cat.topics.some((st) => topicsMatch(t, st)),
   ).length;
   score += topicMatches * 3;
 
-  // Description keyword match: +1.5 per keyword
-  const descMatches = cat.keywords.filter((kw) => desc.includes(kw)).length;
+  // Description keyword match: +1.5 per keyword (skip short keywords to avoid
+  // false positives like "gin" matching "engine")
+  const descMatches = cat.keywords.filter((kw) =>
+    kw.length >= 4 && desc.includes(kw),
+  ).length;
   score += descMatches * 1.5;
 
-  // Repo name match: +1 per keyword
-  const nameMatches = cat.keywords.filter((kw) => name.includes(kw)).length;
+  // Repo name match: +1 per keyword (use repo name, not full_name with owner prefix)
+  const repoName = name.includes("/") ? name.split("/").pop()! : name;
+  const nameMatches = cat.keywords.filter((kw) =>
+    kw.length >= 4 && repoName.includes(kw),
+  ).length;
   score += nameMatches * 1;
 
   return score;

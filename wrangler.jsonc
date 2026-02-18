@@ -23,7 +23,7 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "MAX_STAR_PAGES": "170"
+    "MAX_STAR_PAGES": "50"
   },
 
   // Custom domain: profiles.sh + wildcard subdomains (*.profiles.sh)
