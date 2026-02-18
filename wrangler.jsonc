@@ -27,7 +27,6 @@
   },
 
   // Custom domain: profiles.sh + wildcard subdomains (*.profiles.sh)
-  // Requires profiles.sh zone active on this Cloudflare account with proxied DNS records
   "routes": [
     { "pattern": "profiles.sh/*", "zone_name": "profiles.sh" },
     { "pattern": "*.profiles.sh/*", "zone_name": "profiles.sh" }
@@ -37,11 +36,11 @@
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "0260553cee2741e697e4010590100f3a"
+      "id": "50e80aefe3b940ac9b4f62ba935e5ff5"
     },
     {
       "binding": "SESSION",
-      "id": "63b5528b83e246d291717f266476289f"
+      "id": "17fc0f4c8e664911b5d0a723e484ce2e"
     }
   ],
 
@@ -49,29 +48,26 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "identity-deck",
-      "database_id": "4a47b301-5aa0-4a04-a1a2-b7f36ef78cae",
+      "database_name": "profiles-sh",
+      "database_id": "fd009608-e0b1-4cfd-af34-d4ffbb0053e3",
       "migrations_dir": "migrations"
     }
   ],
 
-  // R2 — Store generated OG images
+  // R2 — Store generated OG images + repo cache
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "identity-deck-assets"
+      "bucket_name": "profiles-sh-assets"
     }
   ],
 
   // Queues — Background processing for large profiles
-  // NOTE: Consumer config is omitted until Astro adapter supports queue handler exports.
-  // The queue consumer logic is in src/lib/queue-consumer.ts and can be wired
-  // via a separate worker or when Astro adds queue handler support.
   "queues": {
     "producers": [
       {
         "binding": "PROFILE_QUEUE",
-        "queue": "profile-computation"
+        "queue": "profiles-sh-queue"
       }
     ]
   },
@@ -80,7 +76,7 @@
   "vectorize": [
     {
       "binding": "VECTORIZE",
-      "index_name": "repo-embeddings"
+      "index_name": "profiles-sh-embeddings"
     }
   ],
 
