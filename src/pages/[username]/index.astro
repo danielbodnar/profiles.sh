@@ -182,7 +182,7 @@ const meta = profileData ? buildMeta(profileData) : "";
 const personaRefs = profileData ? buildPersonaRefs(profileData) : [];
 
 // Compute stats for badges
-const reposAnalyzed = profileData?.projects?.length ?? 0;
+const reposAnalyzed = profileData?.profile?.repos_analyzed ?? profileData?.projects?.length ?? 0;
 const starsAnalyzed = aggregates
   .filter((a: any) => a.agg_type === "language")
   .reduce((sum: number, a: any) => sum + (a.from_starred || 0), 0);

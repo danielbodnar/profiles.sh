@@ -40,8 +40,8 @@ export async function upsertProfile(
       `INSERT INTO profiles (
         username, display_name, bio, location, email, blog, company,
         avatar_url, followers, following, public_repos, created_at,
-        computed_at, github_data_hash, raw_profile
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        computed_at, github_data_hash, raw_profile, repos_analyzed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(username) DO UPDATE SET
         display_name = excluded.display_name,
         bio = excluded.bio,
@@ -56,7 +56,8 @@ export async function upsertProfile(
         created_at = excluded.created_at,
         computed_at = excluded.computed_at,
         github_data_hash = excluded.github_data_hash,
-        raw_profile = excluded.raw_profile`,
+        raw_profile = excluded.raw_profile,
+        repos_analyzed = excluded.repos_analyzed`,
     )
     .bind(
       profile.username,
@@ -74,6 +75,7 @@ export async function upsertProfile(
       profile.computed_at,
       profile.github_data_hash,
       profile.raw_profile,
+      profile.repos_analyzed,
     )
     .run();
 }

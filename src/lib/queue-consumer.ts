@@ -12,7 +12,7 @@
  * Reference: spec lines 910-940.
  */
 
-import { fetchProfile, fetchRepos, fetchStarsIncremental, fetchReadme, filterActiveRepos } from "./github/client";
+import { fetchProfile, fetchAllOwnedRepos, fetchStarsIncremental, fetchReadme, filterActiveRepos } from "./github/client";
 import { putRepoObject } from "./r2/repo-store";
 import { putRepoManifest } from "./r2/repo-manifest";
 import { indexRepos } from "./vectorize/indexer";
@@ -77,7 +77,7 @@ export async function processUsername(
   // 1. Fetch GitHub data (R2 incremental for stars, KV cached for profile/repos)
   const [githubProfile, rawRepos, rawStars] = await Promise.all([
     fetchProfile(username, env, config),
-    fetchRepos(username, env, config),
+    fetchAllOwnedRepos(username, env, config),
     fetchStarsIncremental(username, env, config),
   ]);
 
@@ -151,6 +151,7 @@ export async function processUsername(
     computed_at: new Date().toISOString(),
     github_data_hash: githubDataHash,
     raw_profile: JSON.stringify(githubProfile),
+    repos_analyzed: repos.length,
   };
 
   // 6. Transform engine output to D1 row shapes

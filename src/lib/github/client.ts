@@ -358,6 +358,120 @@ export async function fetchReadme(
   }
 }
 
+/**
+ * Fetch public org memberships for a user, with KV caching.
+ * KV key: github:orgs:{username}
+ *
+ * Returns an array of org login names.
+ */
+export async function fetchUserOrgs(
+  username: string,
+  env: { KV?: KVNamespace; GITHUB_TOKEN?: string },
+  config?: Pick<AppConfig, "cacheTtl">,
+): Promise<string[]> {
+  const ttl = config?.cacheTtl ?? 86400;
+  const cacheKey = `github:orgs:${username}`;
+
+  const cached = await getCached<string[]>(env.KV, cacheKey);
+  if (cached) return cached;
+
+  const res = await githubFetch(
+    `${GITHUB_API}/users/${username}/orgs`,
+    env.GITHUB_TOKEN,
+  );
+
+  if (!res.ok) {
+    // Non-fatal: return empty if orgs can't be fetched
+    console.warn(`[github/client] Failed to fetch orgs for ${username}: ${res.status}`);
+    return [];
+  }
+
+  const data: { login: string }[] = await res.json();
+  const logins = data.map((o) => o.login);
+  await putCached(env.KV, cacheKey, logins, ttl);
+
+  return logins;
+}
+
+/**
+ * Fetch repos for a single org, paginated, with KV caching.
+ * KV key: github:repos:org:{orgname}
+ *
+ * Uses `type=sources` to exclude forks at the API level.
+ * Caps at `config.maxRepoPages` pages (default 5 = 500 repos per org).
+ */
+export async function fetchOrgRepos(
+  org: string,
+  env: { KV?: KVNamespace; GITHUB_TOKEN?: string },
+  config?: Pick<AppConfig, "githubPerPage" | "maxRepoPages" | "cacheTtl">,
+): Promise<GitHubRepo[]> {
+  const perPage = config?.githubPerPage ?? 100;
+  const maxPages = config?.maxRepoPages ?? 5;
+  const ttl = config?.cacheTtl ?? 86400;
+  const cacheKey = `github:repos:org:${org}`;
+
+  const cached = await getCached<GitHubRepo[]>(env.KV, cacheKey);
+  if (cached) return cached;
+
+  const repos: GitHubRepo[] = [];
+  let page = 1;
+
+  while (page <= maxPages) {
+    const res = await githubFetch(
+      `${GITHUB_API}/orgs/${org}/repos?per_page=${perPage}&page=${page}&sort=pushed&type=sources`,
+      env.GITHUB_TOKEN,
+    );
+
+    if (res.status === 404) break;
+    if (res.status === 403) throw new Error("GitHub API rate limit exceeded");
+    if (!res.ok) throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+
+    const data: GitHubRepo[] = await res.json();
+    if (data.length === 0) break;
+
+    repos.push(...data);
+    if (data.length < perPage) break;
+    page++;
+  }
+
+  await putCached(env.KV, cacheKey, repos, ttl);
+  return repos;
+}
+
+/**
+ * Fetch all owned repos: personal + all org repos, deduplicated by full_name.
+ *
+ * Orchestrates fetchRepos() + fetchUserOrgs() + fetchOrgRepos() in parallel.
+ */
+export async function fetchAllOwnedRepos(
+  username: string,
+  env: { KV?: KVNamespace; GITHUB_TOKEN?: string },
+  config?: Pick<AppConfig, "githubPerPage" | "maxRepoPages" | "cacheTtl">,
+): Promise<GitHubRepo[]> {
+  const [personalRepos, orgs] = await Promise.all([
+    fetchRepos(username, env, config),
+    fetchUserOrgs(username, env, config),
+  ]);
+
+  // Fetch org repos in parallel (all orgs at once)
+  const orgRepoArrays = await Promise.all(
+    orgs.map((org) => fetchOrgRepos(org, env, config)),
+  );
+
+  // Combine and deduplicate by full_name
+  const seen = new Set(personalRepos.map((r) => r.full_name));
+  const allRepos = [...personalRepos];
+  for (const orgRepos of orgRepoArrays) {
+    for (const repo of orgRepos) {
+      if (!seen.has(repo.full_name)) {
+        seen.add(repo.full_name);
+        allRepos.push(repo);
+      }
+    }
+  }
+  return allRepos;
+}
+
 // ---------------------------------------------------------------------------
 // Repo filtering
 // ---------------------------------------------------------------------------

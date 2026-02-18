@@ -22,6 +22,7 @@ export interface ProfileRow {
   computed_at: string | null;
   github_data_hash: string | null;
   raw_profile: string | null; // JSON string
+  repos_analyzed: number | null;
 }
 
 /** Row from the `personas` table */
