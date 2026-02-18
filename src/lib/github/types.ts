@@ -70,3 +70,18 @@ export interface GitHubStarEntry {
   starred_at: string;
   repo: GitHubRepo;
 }
+
+/** Shape of the user's `profiles-sh.json` gist for profile customization. */
+export interface GistConfig {
+  featured_repos?: string[];
+  featured_topics?: string[];
+  hidden_categories?: string[];
+  theme?: string;
+  tagline_overrides?: Record<string, string>;
+}
+
+/** GitHub Gist API response (subset of fields we use). */
+export interface GitHubGist {
+  id: string;
+  files: Record<string, { filename: string; raw_url: string; content?: string } | undefined>;
+}

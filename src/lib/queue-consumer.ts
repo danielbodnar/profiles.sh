@@ -12,7 +12,7 @@
  * Reference: spec lines 910-940.
  */
 
-import { fetchProfile, fetchRepos, fetchStarsIncremental, fetchReadme, filterActiveRepos } from "./github/client";
+import { fetchProfile, fetchRepos, fetchStarsIncremental, fetchReadme, filterActiveRepos, fetchGistConfig } from "./github/client";
 import { putRepoObject } from "./r2/repo-store";
 import { putRepoManifest } from "./r2/repo-manifest";
 import { indexRepos } from "./vectorize/indexer";
@@ -23,12 +23,14 @@ import {
   upsertRadarAxes,
   upsertStarInterests,
   upsertAggregates,
+  upsertCustomizations,
 } from "./db/queries";
 import type { ProfileRow } from "./db/types";
 import { generateOGImage } from "./og/generator";
 import { computeFullProfile } from "./engine/index";
 import { resolveConfig } from "./config";
 import type { AppConfig } from "./config";
+import { gistConfigToCustomizationRow, applyPersonaOverrides, applyProjectOverrides } from "./gist-config";
 
 /** Shape of messages produced by the API layer onto PROFILE_QUEUE. */
 export interface QueueMessage {
@@ -75,10 +77,11 @@ export async function processUsername(
   config?: AppConfig,
 ): Promise<void> {
   // 1. Fetch GitHub data (R2 incremental for stars, KV cached for profile/repos)
-  const [githubProfile, rawRepos, rawStars] = await Promise.all([
+  const [githubProfile, rawRepos, rawStars, gistConfig] = await Promise.all([
     fetchProfile(username, env, config),
     fetchRepos(username, env, config),
     fetchStarsIncremental(username, env, config),
+    fetchGistConfig(username, env),
   ]);
 
   // One-time cleanup: remove old per-page KV star keys
@@ -121,7 +124,13 @@ export async function processUsername(
   }
 
   // 3. Run persona engine (deterministic — no AI/LLM)
-  const computed = computeFullProfile(githubProfile, repos, stars);
+  const computed = computeFullProfile(
+    githubProfile,
+    repos,
+    stars,
+    undefined, // use default categories
+    gistConfig?.featured_topics,
+  );
 
   // 4. Build a simple hash of raw data to detect changes on next run
   const githubDataHash = simpleHash(
@@ -154,7 +163,7 @@ export async function processUsername(
   };
 
   // 6. Transform engine output to D1 row shapes
-  const personaRows = computed.personas.map((p) => ({
+  let personaRows = computed.personas.map((p) => ({
     persona_id: p.persona_id,
     title: p.title,
     tagline: p.tagline,
@@ -172,7 +181,7 @@ export async function processUsername(
     sort_order: p.sort_order,
   }));
 
-  const projectRows = computed.projects.map((p, i) => ({
+  let projectRows = computed.projects.map((p, i) => ({
     name: p.name,
     description: p.description,
     url: p.url,
@@ -208,6 +217,15 @@ export async function processUsername(
     sort_order: i,
   }));
 
+  // 6b. Apply gist config overrides (if user has a profiles-sh.json gist)
+  if (gistConfig) {
+    personaRows = applyPersonaOverrides(personaRows, gistConfig);
+    // Re-assign sort_order after filtering/reordering
+    personaRows = personaRows.map((p, i) => ({ ...p, sort_order: i }));
+    projectRows = applyProjectOverrides(projectRows, gistConfig);
+    projectRows = projectRows.map((p, i) => ({ ...p, sort_order: i }));
+  }
+
   // 7. Write everything to D1 (skip gracefully if DB unavailable)
   if (env.DB) {
     try {
@@ -218,6 +236,10 @@ export async function processUsername(
         upsertRadarAxes(env.DB, username, radarRows),
         upsertStarInterests(env.DB, username, interestRows),
         upsertAggregates(env.DB, username, aggregateRows),
+        // Store resolved gist config in customizations table
+        ...(gistConfig
+          ? [upsertCustomizations(env.DB, username, gistConfigToCustomizationRow(username, gistConfig))]
+          : []),
       ]);
     } catch (err) {
       console.warn(`[queue-consumer] D1 write failed for ${username}:`, err);

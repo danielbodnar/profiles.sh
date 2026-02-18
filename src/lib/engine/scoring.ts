@@ -18,6 +18,7 @@ function scoreRepo(
   desc: string,
   name: string,
   cat: Category,
+  featuredTopics?: Set<string>,
 ): number {
   let score = 0;
 
@@ -31,6 +32,14 @@ function scoreRepo(
     cat.topics.some((st) => t.includes(st) || st.includes(t)),
   ).length;
   score += topicMatches * 3;
+
+  // Featured topic boost: +2 bonus per featured topic found on this repo
+  if (featuredTopics && featuredTopics.size > 0) {
+    const featuredMatches = topics.filter((t) =>
+      featuredTopics.has(t) && cat.topics.some((st) => t.includes(st) || st.includes(t)),
+    ).length;
+    score += featuredMatches * 2;
+  }
 
   // Description keyword match: +1.5 per keyword
   const descMatches = cat.keywords.filter((kw) => desc.includes(kw)).length;
@@ -58,11 +67,16 @@ export function computeCategoryScores(
   stars: RepoData[],
   ownedRepos: RepoData[],
   categories: Category[] = CATEGORY_SEEDS,
+  featuredTopics?: string[],
 ): Record<string, number> {
   const scores: Record<string, number> = {};
   for (const cat of categories) {
     scores[cat.id] = 0;
   }
+
+  const ftSet = featuredTopics && featuredTopics.length > 0
+    ? new Set(featuredTopics.map((t) => t.toLowerCase()))
+    : undefined;
 
   for (const repo of stars) {
     const lang = (repo.language || "").toLowerCase();
@@ -71,7 +85,7 @@ export function computeCategoryScores(
     const name = (repo.full_name || "").toLowerCase();
 
     for (const cat of categories) {
-      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat);
+      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat, ftSet);
     }
   }
 
@@ -83,7 +97,7 @@ export function computeCategoryScores(
     const name = (repo.full_name || "").toLowerCase();
 
     for (const cat of categories) {
-      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat) * 3;
+      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat, ftSet) * 3;
     }
   }
 
@@ -124,11 +138,16 @@ export function normalizeToRadar(
 export function computeOwnedRepoScores(
   ownedRepos: RepoData[],
   categories: Category[] = CATEGORY_SEEDS,
+  featuredTopics?: string[],
 ): Record<string, number> {
   const scores: Record<string, number> = {};
   for (const cat of categories) {
     scores[cat.id] = 0;
   }
+
+  const ftSet = featuredTopics && featuredTopics.length > 0
+    ? new Set(featuredTopics.map((t) => t.toLowerCase()))
+    : undefined;
 
   for (const repo of ownedRepos) {
     const lang = (repo.language || "").toLowerCase();
@@ -137,7 +156,7 @@ export function computeOwnedRepoScores(
     const name = (repo.full_name || "").toLowerCase();
 
     for (const cat of categories) {
-      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat);
+      scores[cat.id] += scoreRepo(lang, topics, desc, name, cat, ftSet);
     }
   }
 

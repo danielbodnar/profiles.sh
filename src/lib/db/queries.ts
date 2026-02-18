@@ -320,14 +320,16 @@ export async function upsertCustomizations(
     .prepare(
       `INSERT INTO customizations (
         username, custom_taglines, custom_details, custom_employers,
-        hidden_personas, theme_overrides
-      ) VALUES (?, ?, ?, ?, ?, ?)
+        hidden_personas, theme_overrides, featured_repos, featured_topics
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(username) DO UPDATE SET
         custom_taglines = excluded.custom_taglines,
         custom_details = excluded.custom_details,
         custom_employers = excluded.custom_employers,
         hidden_personas = excluded.hidden_personas,
-        theme_overrides = excluded.theme_overrides`,
+        theme_overrides = excluded.theme_overrides,
+        featured_repos = excluded.featured_repos,
+        featured_topics = excluded.featured_topics`,
     )
     .bind(
       username,
@@ -336,6 +338,8 @@ export async function upsertCustomizations(
       customs.custom_employers,
       customs.hidden_personas,
       customs.theme_overrides,
+      customs.featured_repos ?? null,
+      customs.featured_topics ?? null,
     )
     .run();
 }

@@ -100,6 +100,8 @@ export interface CustomizationRow {
   custom_employers: string | null;  // JSON string: {persona_id: ["employer1", ...]}
   hidden_personas: string | null;   // JSON string: ["persona_id1", ...]
   theme_overrides: string | null;   // JSON string: {darkMode: true, ...}
+  featured_repos: string | null;    // JSON string: ["repo-a", "repo-b"]
+  featured_topics: string | null;   // JSON string: ["rust", "nushell"]
 }
 
 /**

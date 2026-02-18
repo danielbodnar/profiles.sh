@@ -9,7 +9,7 @@
  *   - per_page configurable (default 100)
  */
 
-import type { GitHubProfile, GitHubRepo, GitHubStarEntry, StarsMeta } from "./types";
+import type { GitHubProfile, GitHubRepo, GitHubStarEntry, StarsMeta, GistConfig, GitHubGist } from "./types";
 import { getCached, putCached } from "./cache";
 import type { AppConfig } from "../config";
 import { putRepoObject, getRepoObject } from "../r2/repo-store";
@@ -354,6 +354,97 @@ export async function fetchReadme(
     if (!res.ok) return null;
     return await res.text();
   } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gist-based personalization config
+// ---------------------------------------------------------------------------
+
+const GIST_CONFIG_FILENAME = "profiles-sh.json";
+const GIST_CACHE_TTL = 3600; // 1 hour
+
+/**
+ * Fetch the user's `profiles-sh.json` gist for profile customization.
+ *
+ * Looks through the user's public gists for one containing a file named
+ * `profiles-sh.json`. Caches the result in KV with a 1-hour TTL.
+ * Returns null gracefully if no gist exists or on any error.
+ *
+ * KV key: gist:config:{username}
+ */
+export async function fetchGistConfig(
+  username: string,
+  env: { KV?: KVNamespace; GITHUB_TOKEN?: string },
+): Promise<GistConfig | null> {
+  const cacheKey = `gist:config:${username}`;
+
+  const cached = await getCached<GistConfig | "none">(env.KV, cacheKey);
+  if (cached === "none") return null;
+  if (cached) return cached;
+
+  try {
+    // List the user's public gists (first page only — convention file should be recent)
+    const res = await githubFetch(
+      `${GITHUB_API}/users/${username}/gists?per_page=100`,
+      env.GITHUB_TOKEN,
+    );
+
+    if (!res.ok) {
+      // Cache negative result to avoid repeated API calls
+      await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+      return null;
+    }
+
+    const gists: GitHubGist[] = await res.json();
+
+    // Find the gist that contains the convention filename
+    const match = gists.find(
+      (g) => g.files && g.files[GIST_CONFIG_FILENAME] != null,
+    );
+
+    if (!match) {
+      await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+      return null;
+    }
+
+    const file = match.files[GIST_CONFIG_FILENAME];
+    if (!file) {
+      await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+      return null;
+    }
+
+    // Fetch the raw file content
+    let content = file.content;
+    if (!content && file.raw_url) {
+      const rawRes = await githubFetch(file.raw_url, env.GITHUB_TOKEN);
+      if (!rawRes.ok) {
+        await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+        return null;
+      }
+      content = await rawRes.text();
+    }
+
+    if (!content) {
+      await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+      return null;
+    }
+
+    const config: GistConfig = JSON.parse(content);
+
+    // Basic validation: must be a plain object
+    if (typeof config !== "object" || config === null || Array.isArray(config)) {
+      await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
+      return null;
+    }
+
+    await putCached(env.KV, cacheKey, config, GIST_CACHE_TTL);
+    return config;
+  } catch (err) {
+    console.warn(`[github/client] Failed to fetch gist config for ${username}:`, err);
+    // Cache negative result to avoid hammering the API on persistent errors
+    await putCached(env.KV, cacheKey, "none", GIST_CACHE_TTL);
     return null;
   }
 }
